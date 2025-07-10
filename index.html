@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -149,7 +149,7 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback } = React;
 
-        // --- AI Generation & Utility Functions ---
+        // --- AI Generation & Utility Functions (Unchanged) ---
         const callGeminiAPI = async (prompt, apiKey, isJson = false) => {
             const effectiveApiKey = apiKey || "";
             const model = 'gemini-2.0-flash';
@@ -197,7 +197,7 @@
         };
 
 
-        // --- Helper Components ---
+        // --- Helper Components (Unchanged) ---
         const AddButton = ({ onClick, children }) => (
             <button type="button" onClick={onClick} className="mt-2 text-sm text-blue-600 hover:underline font-medium">
                 {children}
@@ -217,7 +217,7 @@
             </button>
         );
         
-        // --- Download and Print Functions ---
+        // --- MODIFIED Download and Print Functions ---
         const handlePrintAndSaveAsPdf = (markdownContent) => {
             const htmlContent = marked.parse(markdownContent);
             
@@ -227,31 +227,45 @@
                     <head>
                         <title>Cetak Dokumen</title>
                         <style>
+                            /* CSS ini meniru format dokumen Word profesional */
                             @page {
                                 size: A4;
-                                margin: 1in;
+                                margin: 1in; /* Margin 1 inci di semua sisi */
                             }
                             body {
                                 font-family: 'Times New Roman', Times, serif;
                                 font-size: 12pt;
-                                line-height: 1.5;
+                                line-height: 1.5; /* Spasi 1.5 */
                             }
                             p, li {
-                                text-align: justify;
+                                text-align: justify; /* Rata kiri-kanan */
                                 widows: 3;
                                 orphans: 3;
                             }
                             h1, h2, h3, h4 {
                                 font-family: 'Times New Roman', Times, serif;
-                                page-break-after: avoid;
+                                page-break-after: avoid; /* Judul tidak terpisah dari paragraf berikutnya */
+                                font-weight: bold;
                             }
-                            h1 { text-align: center; }
-                            h2 { text-align: left; }
+                            h1 { 
+                                text-align: center;
+                                font-size: 14pt;
+                                text-transform: uppercase;
+                            }
+                            h2 { 
+                                font-size: 12pt;
+                                text-transform: uppercase;
+                                margin-top: 18pt;
+                            }
+                            h3 {
+                                font-size: 12pt;
+                                margin-top: 12pt;
+                            }
                             table {
                                 width: 100%;
                                 border-collapse: collapse;
                                 font-size: 11pt;
-                                page-break-inside: avoid;
+                                page-break-inside: avoid; /* Tabel tidak terpotong halaman */
                             }
                             th, td {
                                 border: 1px solid black;
@@ -260,6 +274,7 @@
                             }
                             th {
                                 background-color: #f2f2f2;
+                                text-align: center;
                             }
                         </style>
                     </head>
@@ -270,7 +285,6 @@
             `);
             printWindow.document.close();
             printWindow.focus();
-            // Use a timeout to ensure content is loaded before printing
             setTimeout(() => {
                 printWindow.print();
                 printWindow.close();
@@ -279,110 +293,116 @@
 
         const handleDownloadDocx = (markdownContent, fileName) => {
             try {
-                const { Document, Packer, Paragraph, TextRun, Table, TableCell, TableRow, WidthType, AlignmentType, HeadingLevel, PageMargin, PageSize } = docx;
+                const { Document, Packer, Paragraph, TextRun, Table, TableCell, TableRow, WidthType, AlignmentType, HeadingLevel, PageMargin, PageSize, Numbering } = docx;
                 
+                // Fungsi ini mengubah markdown menjadi elemen-elemen docx dengan styling
                 const markdownToDocxChildren = (markdown) => {
                     const lines = markdown.split('\n');
                     const children = [];
                     let inTable = false;
-                    let tableHeader = [];
                     let tableRows = [];
 
-                    lines.forEach((line, index) => {
+                    lines.forEach((line) => {
                         line = line.trim();
 
+                        // Penanganan Tabel
                         if (line.startsWith('|')) {
-                            const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
-                            if (!inTable) { // This is the header row
-                                inTable = true;
-                                tableHeader = cells;
-                                // The next line is the separator, so we skip it in the next iteration
-                            } else if (!cells.every(cell => /^-+$/.test(cell))) { // Not a separator line
-                                tableRows.push(new TableRow({
-                                    children: cells.map(cellContent => new TableCell({
-                                        children: [new Paragraph({ 
-                                            children: [new TextRun(cellContent)],
-                                            alignment: AlignmentType.LEFT,
-                                        })],
-                                        width: { size: 4535, type: WidthType.AUTO },
-                                    })),
-                                }));
-                            }
-                        } else {
-                            if (inTable) {
-                                children.push(new Table({
-                                    rows: [
-                                        new TableRow({
-                                            children: tableHeader.map(headerText => new TableCell({
-                                                children: [new Paragraph({ children: [new TextRun({text: headerText, bold: true})], alignment: AlignmentType.CENTER })],
-                                                width: { size: 4535, type: WidthType.AUTO },
-                                            })),
-                                            isHeader: true,
-                                        }),
-                                        ...tableRows
-                                    ],
-                                    width: { size: 100, type: WidthType.PERCENTAGE },
-                                }));
-                                inTable = false;
-                                tableRows = [];
-                                tableHeader = [];
-                            }
+                            if (!inTable) inTable = true;
+                            const cells = line.split('|').slice(1, -1).map(cell => new TableCell({
+                                children: [new Paragraph({ text: cell.trim() })]
+                            }));
+                            tableRows.push(new TableRow({ children: cells }));
+                            return;
+                        } 
+                        
+                        if (inTable) {
+                            children.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+                            inTable = false;
+                            tableRows = [];
+                        }
 
-                            if (line.startsWith('# ')) {
-                                children.push(new Paragraph({ text: line.substring(2), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }));
-                            } else if (line.startsWith('## ')) {
-                                children.push(new Paragraph({ text: line.substring(3), heading: HeadingLevel.HEADING_2 }));
-                            } else if (line.startsWith('### ')) {
-                                children.push(new Paragraph({ text: line.substring(4), heading: HeadingLevel.HEADING_3 }));
-                            } else if (line.startsWith('- ') || line.startsWith('* ')) {
-                                children.push(new Paragraph({ text: line.substring(2), bullet: { level: 0 } }));
-                            } else if (line.match(/^\d+\.\s/)) {
-                                children.push(new Paragraph({ text: line.replace(/^\d+\.\s/, ''), numberId: 1, level: 0 }));
-                            } else if (line.trim().length > 0) {
-                                children.push(new Paragraph({ children: [new TextRun(line)], alignment: AlignmentType.JUSTIFIED }));
-                            }
+                        // Penanganan Judul dan Paragraf
+                        if (line.startsWith('# ')) {
+                            children.push(new Paragraph({ text: line.substring(2), style: "Title" }));
+                        } else if (line.startsWith('## ')) {
+                            children.push(new Paragraph({ text: line.substring(3), style: "Heading1" }));
+                        } else if (line.startsWith('### ')) {
+                             children.push(new Paragraph({ text: line.substring(4), style: "Heading2" }));
+                        } else if (line.match(/^\d+\.\s/)) {
+                            children.push(new Paragraph({ text: line.replace(/^\d+\.\s/, ''), numbering: { reference: "list-numbering", level: 0 }, style: "Justified" }));
+                        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                            children.push(new Paragraph({ text: line.substring(2), bullet: { level: 0 }, style: "Justified" }));
+                        } else if (line.trim().length > 0) {
+                            children.push(new Paragraph({ text: line, style: "Justified" }));
                         }
                     });
-
-                    if (inTable) {
-                         children.push(new Table({
-                            rows: [
-                                new TableRow({
-                                    children: tableHeader.map(headerText => new TableCell({
-                                        children: [new Paragraph({ children: [new TextRun({text: headerText, bold: true})], alignment: AlignmentType.CENTER })],
-                                    })),
-                                    isHeader: true,
-                                }),
-                                ...tableRows
-                            ],
-                            width: { size: 100, type: WidthType.PERCENTAGE },
-                        }));
+                    
+                    if (inTable) { // Jika dokumen berakhir dengan tabel
+                        children.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
                     }
+
                     return children;
                 };
 
                 const doc = new Document({
+                    // Mendefinisikan gaya (styles) untuk dokumen
                     styles: {
-                        default: {
-                            document: {
-                                run: {
-                                    size: "12pt",
-                                    font: "Times New Roman",
-                                },
+                        paragraphStyles: [
+                            {
+                                id: "Normal",
+                                name: "Normal",
+                                run: { font: "Times New Roman", size: 24 }, // 12pt
+                                paragraph: { spacing: { line: 360 } }, // 1.5 spasi
                             },
-                        },
+                            {
+                                id: "Justified",
+                                name: "Justified",
+                                basedOn: "Normal",
+                                paragraph: { alignment: AlignmentType.JUSTIFIED },
+                            },
+                            {
+                                id: "Title",
+                                name: "Title",
+                                basedOn: "Normal",
+                                run: { size: 28, bold: true, allCaps: true }, // 14pt
+                                paragraph: { alignment: AlignmentType.CENTER, spacing: { after: 240 } },
+                            },
+                            {
+                                id: "Heading1",
+                                name: "Heading 1",
+                                basedOn: "Normal",
+                                run: { size: 24, bold: true, allCaps: true }, // 12pt
+                                paragraph: { alignment: AlignmentType.LEFT, spacing: { before: 240, after: 120 } },
+                            },
+                            {
+                                id: "Heading2",
+                                name: "Heading 2",
+                                basedOn: "Normal",
+                                run: { size: 24, bold: true }, // 12pt
+                                paragraph: { alignment: AlignmentType.LEFT, spacing: { before: 120, after: 60 } },
+                            },
+                        ]
+                    },
+                    numbering: {
+                        config: [{
+                            reference: "list-numbering",
+                            levels: [{
+                                level: 0,
+                                format: "decimal",
+                                text: "%1.",
+                                alignment: AlignmentType.START,
+                                style: { paragraph: { indent: { left: 720, hanging: 360 } } },
+                            }],
+                        }],
                     },
                     sections: [{
                         properties: {
                             pageSize: {
                                 width: PageSize.A4.width,
                                 height: PageSize.A4.height,
-                                orientation: PageSize.A4.orientation,
                             },
                             page: {
-                                margin: {
-                                    top: 1440, right: 1440, bottom: 1440, left: 1440, // 1 inch = 1440 twips
-                                },
+                                margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, // 1 inch
                             },
                         },
                         children: markdownToDocxChildren(markdownContent),
@@ -409,7 +429,7 @@
         };
 
 
-        // --- Main Application Component ---
+        // --- Main Application Component (Unchanged) ---
         const App = () => {
             const [apiKey, setApiKey] = useState('');
             const [apiKeyEntered, setApiKeyEntered] = useState(false);
@@ -493,7 +513,7 @@
             );
         };
 
-        // --- Generator for Kerangka Acuan PROGRAM ---
+        // --- Generator for Kerangka Acuan PROGRAM (Unchanged) ---
         const KerangkaAcuanProgramGenerator = ({ apiKey, showToast }) => {
             const [namaPuskesmas, setNamaPuskesmas] = useState('');
             const [kecamatan, setKecamatan] = useState('');
@@ -915,7 +935,7 @@
             );
         };
 
-        // --- Generator for Kerangka Acuan KEGIATAN ---
+        // --- Generator for Kerangka Acuan KEGIATAN (Unchanged) ---
         const KerangkaAcuanKegiatanGenerator = ({ apiKey, showToast }) => {
             const [namaPuskesmas, setNamaPuskesmas] = useState('');
             const [tahun, setTahun] = useState(new Date().getFullYear().toString());
