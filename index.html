@@ -147,7 +147,15 @@
     <script type="text/babel">
         const { useState, useEffect, useCallback } = React;
 
-        // --- AI Generation & Utility Functions (Unchanged) ---
+        // --- AI Generation & Utility Functions ---
+        /**
+         * Calls the Gemini API to generate content based on a given prompt.
+         * @param {string} prompt - The text prompt for the AI.
+         * @param {string} apiKey - The API key for Google AI Studio.
+         * @param {boolean} isJson - True if the expected response is JSON, false otherwise.
+         * @returns {Promise<string|object>} The generated text or parsed JSON object.
+         * @throws {Error} If the API call fails or returns an unexpected format.
+         */
         const callGeminiAPI = async (prompt, apiKey, isJson = false) => {
             const effectiveApiKey = apiKey || "";
             const model = 'gemini-2.0-flash';
@@ -178,6 +186,7 @@
                 if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
                     const text = result.candidates[0].content.parts[0].text;
                     if (isJson) {
+                         // Sanitize the text by removing markdown code blocks before parsing as JSON
                          const sanitizedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
                          return JSON.parse(sanitizedText);
                     }
@@ -195,7 +204,7 @@
         };
 
 
-        // --- Helper Components (Unchanged) ---
+        // --- Helper Components ---
         const AddButton = ({ onClick, children }) => (
             <button type="button" onClick={onClick} className="mt-2 text-sm text-blue-600 hover:underline font-medium">
                 {children}
@@ -215,8 +224,13 @@
             </button>
         );
         
-        // --- REVISED Export Functions ---
-        const handlePrintInNewTab = (markdownContent) => {
+        // --- Export Functions ---
+        /**
+         * Opens a new tab and displays the markdown content formatted for printing.
+         * @param {string} markdownContent - The markdown string to be printed.
+         * @param {function} showToast - Function to display toast messages.
+         */
+        const handlePrintInNewTab = (markdownContent, showToast) => {
             const htmlContent = marked.parse(markdownContent);
             const printWindow = window.open('', '_blank');
             
@@ -275,10 +289,16 @@
                 printWindow.document.close();
                 printWindow.focus();
             } else {
-                alert("Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini.");
+                // Use a custom message box instead of alert()
+                showToast("Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini.");
             }
         };
 
+        /**
+         * Copies the given markdown content to the clipboard.
+         * @param {string} markdownContent - The markdown string to be copied.
+         * @param {function} showToast - Function to display toast messages.
+         */
         const handleCopyToClipboard = (markdownContent, showToast) => {
             const textarea = document.createElement('textarea');
             textarea.value = markdownContent;
@@ -288,6 +308,7 @@
             textarea.focus();
             textarea.select();
             try {
+                // Use document.execCommand('copy') for clipboard operations in iframes
                 document.execCommand('copy');
                 showToast('Teks berhasil disalin!');
             } catch (err) {
@@ -297,18 +318,25 @@
             document.body.removeChild(textarea);
         };
 
-        // --- Main Application Component (Unchanged) ---
+        // --- Main Application Component ---
         const App = () => {
             const [apiKey, setApiKey] = useState('');
             const [apiKeyEntered, setApiKeyEntered] = useState(false);
             const [activeTab, setActiveTab] = useState('program');
             const [toastMessage, setToastMessage] = useState('');
 
+            /**
+             * Displays a toast message for a short duration.
+             * @param {string} message - The message to display.
+             */
             const showToast = (message) => {
                 setToastMessage(message);
                 setTimeout(() => setToastMessage(''), 3000);
             };
 
+            /**
+             * Handles the submission of the API key.
+             */
             const handleApiKeySubmit = () => {
                 if (apiKey.trim() !== '') {
                     setApiKeyEntered(true);
@@ -319,6 +347,7 @@
                 }
             };
             
+            // Effect to check for initial API key from environment
             useEffect(() => {
                 if (typeof __initial_api_key !== 'undefined' && __initial_api_key) {
                     setApiKey(__initial_api_key);
@@ -381,9 +410,9 @@
             );
         };
 
-        // --- Generator for Kerangka Acuan PROGRAM (MODIFIED to use new export buttons) ---
+        // --- Generator for Kerangka Acuan PROGRAM ---
         const KerangkaAcuanProgramGenerator = ({ apiKey, showToast }) => {
-            // All state declarations remain the same...
+            // State declarations for program generator
             const [namaPuskesmas, setNamaPuskesmas] = useState('');
             const [kecamatan, setKecamatan] = useState('');
             const [kabupaten, setKabupaten] = useState('');
@@ -410,7 +439,12 @@
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
-            // All handleGenerateSection, handleGenerateRootCauses, etc. functions remain the same...
+            // Clear generated markdown when component mounts or program name changes
+            useEffect(() => {
+                setGeneratedMarkdown('');
+            }, [namaProgram]);
+
+            // Function to handle AI generation for specific sections
             const handleGenerateSection = useCallback(async (section) => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
@@ -488,6 +522,7 @@
                 }
             }, [namaProgram, apiKey, showToast, namaPuskesmas, pengorganisasian, kegiatanPokok, topPriorities]);
 
+            // Function to generate root causes for a specific problem
             const handleGenerateRootCauses = useCallback(async (masalahId) => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
@@ -514,14 +549,16 @@
                 }
             }, [masalah, apiKey, showToast]);
 
+            // Function to analyze priorities based on USG matrix
             const handleAnalyzePriorities = () => {
                 const priorities = masalah.map(m => {
                     if (!m.rootCauses || m.rootCauses.length === 0) {
                         return { problemText: m.text, topRootCause: null };
                     }
+                    // Sort root causes by USG score (U*S*G) in descending order
                     const sortedRootCauses = [...m.rootCauses].sort((a, b) => (b.U * b.S * b.G) - (a.U * a.S * a.G));
                     return { problemText: m.text, topRootCause: sortedRootCauses[0] };
-                }).filter(p => p.topRootCause);
+                }).filter(p => p.topRootCause); // Filter out problems without root causes
 
                 setTopPriorities(priorities);
 
@@ -531,11 +568,13 @@
                     return;
                 }
                 
+                // Format the priority text for display
                 const priorityText = `Berdasarkan data tersebut di atas, maka prioritas peningkatan mutu untuk program "${namaProgram}" adalah:\n` + priorities.map(p => `- ${p.topRootCause.text} (terkait masalah: ${p.problemText})`).join('\n');
                 setPilihanPrioritas(priorityText);
                 showToast('Analisis prioritas selesai.');
             };
 
+            // Function to generate main activities based on identified priorities
             const handleGenerateKegiatanFromPriorities = useCallback(async () => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
@@ -561,6 +600,7 @@
                 }
             }, [topPriorities, namaProgram, apiKey, showToast]);
 
+            // Function to generate detailed implementation table
             const handleGenerateRincianPelaksanaan = useCallback(async () => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
@@ -583,6 +623,7 @@
                 }
             }, [kegiatanPokok, apiKey, showToast]);
 
+            // Main function to generate the complete program framework document
             const handleGenerate = useCallback(async () => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Tidak dapat membuat dokumen.');
@@ -627,6 +668,7 @@
                 sasaranUmum, rincianPelaksanaan, jadwal, evaluasi, pencatatan, apiKey, showToast
             ]);
             
+            // Helper functions for managing lists (problems, root causes, etc.)
             const addMasalah = () => setMasalah(prev => [...prev, {id: Date.now(), text: '', rootCauses: []}]);
             const removeMasalah = (id) => setMasalah(prev => prev.filter(m => m.id !== id));
             const updateMasalahText = (id, text) => setMasalah(prev => prev.map(m => m.id === id ? {...m, text} : m));
@@ -641,7 +683,7 @@
 
             return (
                 <div>
-                    {/* All form sections are unchanged */}
+                    {/* General Information Section */}
                     <div className="form-section">
                         <h2>Informasi Umum</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -652,11 +694,12 @@
                             <div className="md:col-span-2"><label className="form-label font-semibold">Nama Program</label><input type="text" className="form-input" value={namaProgram} onChange={e => setNamaProgram(e.target.value)} placeholder="Contoh: Peningkatan Mutu Program KIA" /></div>
                         </div>
                     </div>
-                    {/* ... other form sections ... */}
+                    {/* Bab I. Pendahuluan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>I. Pendahuluan</h2><AiButton onClick={() => handleGenerateSection('pendahuluan')} isLoading={isLoading.pendahuluan} /></div>
                         <textarea className="form-textarea" rows="3" value={pendahuluan} onChange={e => setPendahuluan(e.target.value)} placeholder="Jelaskan hal-hal umum terkait program..."></textarea>
                     </div>
+                    {/* Bab II. Latar Belakang Section */}
                     <div className="form-section">
                         <h2>II. Latar Belakang</h2>
                         <label className="form-label font-semibold">A-C. Analisis Masalah & Penentuan Prioritas</label>
@@ -696,6 +739,7 @@
                         <label className="form-label font-semibold mt-6">D. Pilihan Prioritas (Hasil Analisis)</label>
                         <textarea className="form-textarea bg-gray-100" rows="4" value={pilihanPrioritas} readOnly placeholder="Hasil analisis prioritas akan muncul di sini..."></textarea>
                     </div>
+                    {/* Bab III. Pengorganisasian dan Tata Hubungan Kerja Section */}
                     <div className="form-section">
                         <h2>III. Pengorganisasian dan Tata Hubungan Kerja</h2>
                         <div className="flex justify-between items-center mb-2"><label className="form-label">A. Pengorganisasian</label><AiButton onClick={() => handleGenerateSection('pengorganisasian')} isLoading={isLoading.pengorganisasian} /></div>
@@ -705,6 +749,7 @@
                         <div className="flex justify-between items-center mb-2 mt-4"><label className="form-label">C. Alur Pelaporan</label><AiButton onClick={() => handleGenerateSection('pelaporan')} isLoading={isLoading.pelaporan} /></div>
                         <textarea className="form-textarea" rows="4" value={pelaporan} onChange={e => setPelaporan(e.target.value)}></textarea>
                     </div>
+                    {/* Bab IV. Tujuan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>IV. Tujuan</h2><AiButton onClick={() => handleGenerateSection('tujuan')} isLoading={isLoading.tujuan} /></div>
                         <label className="form-label">A. Tujuan Umum</label>
@@ -715,6 +760,7 @@
                         ))}
                         <AddButton onClick={() => addListItem(setTujuanKhusus, tujuanKhusus)}>+ Tambah Tujuan Khusus</AddButton>
                     </div>
+                    {/* Bab V. Kegiatan Pokok dan Rincian Kegiatan Section */}
                     <div className="form-section">
                          <div className="flex justify-between items-center"><h2>V. Kegiatan Pokok dan Rincian Kegiatan</h2><AiButton onClick={handleGenerateKegiatanFromPriorities} isLoading={isLoading.kegiatanFromPrio}>Generate dari Prioritas</AiButton></div>
                         <p className="text-sm text-gray-500 mb-4">Klik "Generate dari Prioritas" untuk membuat kegiatan berdasarkan analisis di Bab II, atau isi secara manual.</p>
@@ -734,6 +780,7 @@
                         ))}
                          <AddButton onClick={() => setKegiatanPokok([...(kegiatanPokok || []), {id: Date.now(), nama: '', rincian: [{id: Date.now()+1, text: ''}]}])}>+ Tambah Kegiatan Pokok</AddButton>
                     </div>
+                    {/* Bab VI. Cara melaksanakan kegiatan dan sasaran Section */}
                     <div className="form-section">
                         <h2>VI. Cara melaksanakan kegiatan dan sasaran</h2>
                         <div className="flex justify-between items-center mb-2"><label className="form-label font-semibold">A. Cara melaksanakan kegiatan</label><AiButton onClick={() => handleGenerateSection('caraMelaksanakanUmum')} isLoading={isLoading.caraMelaksanakanUmum} /></div>
@@ -763,6 +810,7 @@
                             </table>
                         </div>
                     </div>
+                    {/* Bab VII. Jadwal Kegiatan Section */}
                     <div className="form-section">
                         <h2>VII. Jadwal Kegiatan</h2>
                         <div className="overflow-x-auto">
@@ -776,10 +824,12 @@
                             </table>
                         </div>
                     </div>
+                    {/* Bab VIII. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>VIII. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya</h2><AiButton onClick={() => handleGenerateSection('evaluasi')} isLoading={isLoading.evaluasi} /></div>
                         <textarea className="form-textarea" rows="3" value={evaluasi} onChange={e => setEvaluasi(e.target.value)} placeholder="Jelaskan kapan evaluasi dilakukan dan bagaimana pelaporannya..."></textarea>
                     </div>
+                    {/* Bab IX. Pencatatan, Pelaporan dan Evaluasi Kegiatan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>IX. Pencatatan, Pelaporan dan Evaluasi Kegiatan</h2><AiButton onClick={() => handleGenerateSection('pencatatan')} isLoading={isLoading.pencatatan} /></div>
                         <textarea className="form-textarea" rows="3" value={pencatatan} onChange={e => setPencatatan(e.target.value)} placeholder="Jelaskan bagaimana pencatatan, pelaporan, dan evaluasi kegiatan secara menyeluruh..."></textarea>
@@ -794,7 +844,7 @@
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-2xl font-bold text-green-400">Hasil Dokumen</h2>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handlePrintInNewTab(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Buka Halaman Cetak</button>
+                                    <button onClick={() => handlePrintInNewTab(generatedMarkdown, showToast)} className="btn-secondary bg-red-600 hover:bg-red-700">Buka Halaman Cetak</button>
                                     <button onClick={() => handleCopyToClipboard(generatedMarkdown, showToast)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Salin Teks</button>
                                 </div>
                             </div>
@@ -805,9 +855,9 @@
             );
         };
 
-        // --- Generator for Kerangka Acuan KEGIATAN (MODIFIED to use new export buttons) ---
+        // --- Generator for Kerangka Acuan KEGIATAN ---
         const KerangkaAcuanKegiatanGenerator = ({ apiKey, showToast }) => {
-            // All state declarations remain the same...
+            // State declarations for activity framework generator
             const [namaPuskesmas, setNamaPuskesmas] = useState('');
             const [tahun, setTahun] = useState(new Date().getFullYear().toString());
             const [namaKegiatan, setNamaKegiatan] = useState('');
@@ -827,11 +877,17 @@
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
-            // All handleGenerateSection and other logic functions remain the same...
+            // Clear generated markdown when component mounts or activity name changes
+            useEffect(() => {
+                setGeneratedMarkdown('');
+            }, [namaKegiatan]);
+
+            // Helper functions for managing lists
             const handleListChange = (setter, list, id, value) => setter(list.map(item => item.id === id ? { ...item, text: value } : item));
             const addListItem = (setter, list) => setter([...list, {id: Date.now(), text: ''}]);
             const removeListItem = (setter, list, id) => setter(list.filter(item => item.id !== id));
 
+            // Function to handle AI generation for specific sections
             const handleGenerateSection = useCallback(async (section) => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
@@ -902,6 +958,7 @@
                 }
             }, [namaKegiatan, namaPuskesmas, apiKey, showToast]);
 
+            // Main function to generate the complete activity framework document
             const handleGenerate = useCallback(async () => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Tidak dapat membuat dokumen.');
@@ -947,7 +1004,7 @@
 
             return (
                 <div>
-                    {/* Form sections for KAK Generator */}
+                    {/* General Information Section for KAK */}
                     <div className="form-section">
                         <h2>Informasi Umum</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -956,17 +1013,19 @@
                             <div className="md:col-span-2"><label className="form-label font-semibold">Nama Kegiatan</label><input type="text" className="form-input" value={namaKegiatan} onChange={e => setNamaKegiatan(e.target.value)} placeholder="Contoh: Kelas Ibu Hamil di Desa Sukamaju" /></div>
                         </div>
                     </div>
-                    {/* ... other form sections ... */}
+                    {/* A. Pendahuluan Section */}
                      <div className="form-section">
                         <div className="flex justify-between items-center"><h2>A. Pendahuluan</h2><AiButton onClick={() => handleGenerateSection('pendahuluan')} isLoading={isLoading.pendahuluan} /></div>
                         <textarea className="form-textarea" rows="3" value={pendahuluan} onChange={e => setPendahuluan(e.target.value)}></textarea>
                     </div>
 
+                    {/* B. Latar Belakang Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>B. Latar Belakang</h2><AiButton onClick={() => handleGenerateSection('latarBelakang')} isLoading={isLoading.latarBelakang} /></div>
                         <textarea className="form-textarea" rows="3" value={latarBelakang} onChange={e => setLatarBelakang(e.target.value)}></textarea>
                     </div>
 
+                    {/* C. Tujuan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>C. Tujuan</h2><AiButton onClick={() => handleGenerateSection('tujuan')} isLoading={isLoading.tujuan} /></div>
                         <label className="form-label">Tujuan Umum</label>
@@ -978,6 +1037,7 @@
                         <AddButton onClick={() => addListItem(setTujuanKhusus, tujuanKhusus)}>+ Tambah Tujuan Khusus</AddButton>
                     </div>
 
+                    {/* D. Kegiatan Pokok dan Rincian Kegiatan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>D. Kegiatan Pokok dan Rincian Kegiatan</h2><AiButton onClick={() => handleGenerateSection('kegiatan')} isLoading={isLoading.kegiatan} /></div>
                         <label className="form-label">Kegiatan Pokok</label>
@@ -993,16 +1053,19 @@
                         <AddButton onClick={() => addListItem(setRincianKegiatan, rincianKegiatan)}>+ Tambah Rincian Kegiatan</AddButton>
                     </div>
 
+                    {/* E. Cara Melaksanakan Kegiatan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>E. Cara Melaksanakan Kegiatan</h2><AiButton onClick={() => handleGenerateSection('caraMelaksanakan')} isLoading={isLoading.caraMelaksanakan} /></div>
                         <textarea className="form-textarea" rows="3" value={caraMelaksanakan} onChange={e => setCaraMelaksanakan(e.target.value)}></textarea>
                     </div>
 
+                    {/* F. Sasaran Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>F. Sasaran</h2><AiButton onClick={() => handleGenerateSection('sasaran')} isLoading={isLoading.sasaran} /></div>
                         <textarea className="form-textarea" rows="3" value={sasaran} onChange={e => setSasaran(e.target.value)} placeholder="Contoh:&#10;- Ibu hamil trimester 1, 2, dan 3&#10;- Kader Posyandu"></textarea>
                     </div>
 
+                    {/* G. Jadwal Pelaksanaan Kegiatan Section */}
                     <div className="form-section">
                         <h2>G. Jadwal Pelaksanaan Kegiatan</h2>
                         <div className="overflow-x-auto">
@@ -1017,11 +1080,13 @@
                         </div>
                     </div>
 
+                    {/* H. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>H. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya</h2><AiButton onClick={() => handleGenerateSection('evaluasi')} isLoading={isLoading.evaluasi} /></div>
                         <textarea className="form-textarea" rows="3" value={evaluasi} onChange={e => setEvaluasi(e.target.value)}></textarea>
                     </div>
 
+                    {/* I. Pencatatan, Pelaporan, dan Evaluasi Kegiatan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>I. Pencatatan, Pelaporan, dan Evaluasi Kegiatan</h2><AiButton onClick={() => handleGenerateSection('pencatatan')} isLoading={isLoading.pencatatan} /></div>
                         <textarea className="form-textarea" rows="3" value={pencatatan} onChange={e => setPencatatan(e.target.value)}></textarea>
@@ -1036,7 +1101,7 @@
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-2xl font-bold text-green-400">Hasil Dokumen</h2>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handlePrintInNewTab(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Buka Halaman Cetak</button>
+                                    <button onClick={() => handlePrintInNewTab(generatedMarkdown, showToast)} className="btn-secondary bg-red-600 hover:bg-red-700">Buka Halaman Cetak</button>
                                     <button onClick={() => handleCopyToClipboard(generatedMarkdown, showToast)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Salin Teks</button>
                                 </div>
                             </div>
