@@ -3,19 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal Generator Kerangka Acuan (Narasi & Logika Lengkap)</title>
+    <title>Portal Generator Kerangka Acuan</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Libraries for DOCX generation and Markdown parsing -->
-    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+    <!-- Library untuk mengubah Markdown ke HTML -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Tinos:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -217,217 +215,87 @@
             </button>
         );
         
-        // --- MODIFIED Download and Print Functions ---
-        const handlePrintAndSaveAsPdf = (markdownContent) => {
+        // --- REVISED Export Functions ---
+        const handlePrintInNewTab = (markdownContent) => {
             const htmlContent = marked.parse(markdownContent);
-            
             const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <html>
-                    <head>
-                        <title>Cetak Dokumen</title>
-                        <style>
-                            /* CSS ini meniru format dokumen Word profesional */
-                            @page {
-                                size: A4;
-                                margin: 1in; /* Margin 1 inci di semua sisi */
-                            }
-                            body {
-                                font-family: 'Times New Roman', Times, serif;
-                                font-size: 12pt;
-                                line-height: 1.5; /* Spasi 1.5 */
-                            }
-                            p, li {
-                                text-align: justify; /* Rata kiri-kanan */
-                                widows: 3;
-                                orphans: 3;
-                            }
-                            h1, h2, h3, h4 {
-                                font-family: 'Times New Roman', Times, serif;
-                                page-break-after: avoid; /* Judul tidak terpisah dari paragraf berikutnya */
-                                font-weight: bold;
-                            }
-                            h1 { 
-                                text-align: center;
-                                font-size: 14pt;
-                                text-transform: uppercase;
-                            }
-                            h2 { 
-                                font-size: 12pt;
-                                text-transform: uppercase;
-                                margin-top: 18pt;
-                            }
-                            h3 {
-                                font-size: 12pt;
-                                margin-top: 12pt;
-                            }
-                            table {
-                                width: 100%;
-                                border-collapse: collapse;
-                                font-size: 11pt;
-                                page-break-inside: avoid; /* Tabel tidak terpotong halaman */
-                            }
-                            th, td {
-                                border: 1px solid black;
-                                padding: 5px;
-                                text-align: left;
-                            }
-                            th {
-                                background-color: #f2f2f2;
-                                text-align: center;
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        ${htmlContent}
-                    </body>
-                </html>
-            `);
-            printWindow.document.close();
-            printWindow.focus();
-            setTimeout(() => {
-                printWindow.print();
-                printWindow.close();
-            }, 500);
-        };
-
-        const handleDownloadDocx = (markdownContent, fileName) => {
-            try {
-                const { Document, Packer, Paragraph, TextRun, Table, TableCell, TableRow, WidthType, AlignmentType, HeadingLevel, PageMargin, PageSize, Numbering } = docx;
-                
-                // Fungsi ini mengubah markdown menjadi elemen-elemen docx dengan styling
-                const markdownToDocxChildren = (markdown) => {
-                    const lines = markdown.split('\n');
-                    const children = [];
-                    let inTable = false;
-                    let tableRows = [];
-
-                    lines.forEach((line) => {
-                        line = line.trim();
-
-                        // Penanganan Tabel
-                        if (line.startsWith('|')) {
-                            if (!inTable) inTable = true;
-                            const cells = line.split('|').slice(1, -1).map(cell => new TableCell({
-                                children: [new Paragraph({ text: cell.trim() })]
-                            }));
-                            tableRows.push(new TableRow({ children: cells }));
-                            return;
-                        } 
-                        
-                        if (inTable) {
-                            children.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
-                            inTable = false;
-                            tableRows = [];
-                        }
-
-                        // Penanganan Judul dan Paragraf
-                        if (line.startsWith('# ')) {
-                            children.push(new Paragraph({ text: line.substring(2), style: "Title" }));
-                        } else if (line.startsWith('## ')) {
-                            children.push(new Paragraph({ text: line.substring(3), style: "Heading1" }));
-                        } else if (line.startsWith('### ')) {
-                             children.push(new Paragraph({ text: line.substring(4), style: "Heading2" }));
-                        } else if (line.match(/^\d+\.\s/)) {
-                            children.push(new Paragraph({ text: line.replace(/^\d+\.\s/, ''), numbering: { reference: "list-numbering", level: 0 }, style: "Justified" }));
-                        } else if (line.startsWith('- ') || line.startsWith('* ')) {
-                            children.push(new Paragraph({ text: line.substring(2), bullet: { level: 0 }, style: "Justified" }));
-                        } else if (line.trim().length > 0) {
-                            children.push(new Paragraph({ text: line, style: "Justified" }));
-                        }
-                    });
-                    
-                    if (inTable) { // Jika dokumen berakhir dengan tabel
-                        children.push(new Table({ rows: tableRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
-                    }
-
-                    return children;
-                };
-
-                const doc = new Document({
-                    // Mendefinisikan gaya (styles) untuk dokumen
-                    styles: {
-                        paragraphStyles: [
-                            {
-                                id: "Normal",
-                                name: "Normal",
-                                run: { font: "Times New Roman", size: 24 }, // 12pt
-                                paragraph: { spacing: { line: 360 } }, // 1.5 spasi
-                            },
-                            {
-                                id: "Justified",
-                                name: "Justified",
-                                basedOn: "Normal",
-                                paragraph: { alignment: AlignmentType.JUSTIFIED },
-                            },
-                            {
-                                id: "Title",
-                                name: "Title",
-                                basedOn: "Normal",
-                                run: { size: 28, bold: true, allCaps: true }, // 14pt
-                                paragraph: { alignment: AlignmentType.CENTER, spacing: { after: 240 } },
-                            },
-                            {
-                                id: "Heading1",
-                                name: "Heading 1",
-                                basedOn: "Normal",
-                                run: { size: 24, bold: true, allCaps: true }, // 12pt
-                                paragraph: { alignment: AlignmentType.LEFT, spacing: { before: 240, after: 120 } },
-                            },
-                            {
-                                id: "Heading2",
-                                name: "Heading 2",
-                                basedOn: "Normal",
-                                run: { size: 24, bold: true }, // 12pt
-                                paragraph: { alignment: AlignmentType.LEFT, spacing: { before: 120, after: 60 } },
-                            },
-                        ]
-                    },
-                    numbering: {
-                        config: [{
-                            reference: "list-numbering",
-                            levels: [{
-                                level: 0,
-                                format: "decimal",
-                                text: "%1.",
-                                alignment: AlignmentType.START,
-                                style: { paragraph: { indent: { left: 720, hanging: 360 } } },
-                            }],
-                        }],
-                    },
-                    sections: [{
-                        properties: {
-                            pageSize: {
-                                width: PageSize.A4.width,
-                                height: PageSize.A4.height,
-                            },
-                            page: {
-                                margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 }, // 1 inch
-                            },
-                        },
-                        children: markdownToDocxChildren(markdownContent),
-                    }],
-                });
-
-                Packer.toBlob(doc).then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement("a");
-                    a.href = url;
-                    a.download = `${fileName}.docx`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                }).catch(err => {
-                    console.error("Error packing DOCX:", err);
-                    alert("Gagal membuat file DOCX.");
-                });
-            } catch (error) {
-                console.error("Error creating DOCX:", error);
-                alert("Gagal memproses file DOCX.");
+            
+            if (printWindow) {
+                printWindow.document.write(`
+                    <html>
+                        <head>
+                            <title>Cetak Dokumen</title>
+                            <style>
+                                @page { size: A4; margin: 1in; }
+                                body { 
+                                    font-family: 'Times New Roman', Times, serif; 
+                                    font-size: 12pt; 
+                                    line-height: 1.5; 
+                                    background-color: #e0e0e0; /* Match background for consistency */
+                                    padding: 2rem 0;
+                                }
+                                .page-container {
+                                    width: 21cm;
+                                    min-height: 29.7cm;
+                                    padding: 1in;
+                                    margin: 0 auto;
+                                    background: white;
+                                    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                                }
+                                p, li { text-align: justify; widows: 3; orphans: 3; }
+                                h1, h2, h3, h4 { font-family: 'Times New Roman', Times, serif; page-break-after: avoid; font-weight: bold; }
+                                h1 { text-align: center; font-size: 14pt; text-transform: uppercase; }
+                                h2 { font-size: 12pt; text-transform: uppercase; margin-top: 18pt; }
+                                h3 { font-size: 12pt; margin-top: 12pt; }
+                                table { width: 100%; border-collapse: collapse; font-size: 11pt; page-break-inside: avoid; }
+                                th, td { border: 1px solid black; padding: 5px; text-align: left; }
+                                th { background-color: #f2f2f2; text-align: center; }
+                                @media print {
+                                    body {
+                                        background-color: white;
+                                        padding: 0;
+                                    }
+                                    .page-container {
+                                        box-shadow: none;
+                                        margin: 0;
+                                        width: auto;
+                                        min-height: auto;
+                                        padding: 0;
+                                    }
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="page-container">
+                                ${htmlContent}
+                            </div>
+                        </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                printWindow.focus();
+            } else {
+                alert("Gagal membuka tab baru. Mohon izinkan pop-up untuk situs ini.");
             }
         };
 
+        const handleCopyToClipboard = (markdownContent, showToast) => {
+            const textarea = document.createElement('textarea');
+            textarea.value = markdownContent;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                showToast('Teks berhasil disalin!');
+            } catch (err) {
+                showToast('Gagal menyalin teks.');
+                console.error('Gagal menyalin: ', err);
+            }
+            document.body.removeChild(textarea);
+        };
 
         // --- Main Application Component (Unchanged) ---
         const App = () => {
@@ -513,8 +381,9 @@
             );
         };
 
-        // --- Generator for Kerangka Acuan PROGRAM (Unchanged) ---
+        // --- Generator for Kerangka Acuan PROGRAM (MODIFIED to use new export buttons) ---
         const KerangkaAcuanProgramGenerator = ({ apiKey, showToast }) => {
+            // All state declarations remain the same...
             const [namaPuskesmas, setNamaPuskesmas] = useState('');
             const [kecamatan, setKecamatan] = useState('');
             const [kabupaten, setKabupaten] = useState('');
@@ -541,6 +410,7 @@
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
+            // All handleGenerateSection, handleGenerateRootCauses, etc. functions remain the same...
             const handleGenerateSection = useCallback(async (section) => {
                 if (!apiKey) {
                     showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
@@ -733,13 +603,13 @@
                     ${JSON.stringify(allData, null, 2)}
 
                     **Instruksi Pemformatan dan Narasi:**
-                    1.  **Judul Utama:** Buat judul yang lengkap dan letakkan di tengah. Contoh: "# KERANGKA ACUAN PROGRAM [Nama Program]\\n## PUSKESMAS [Nama Puskesmas] TAHUN [Tahun]".
+                    1.  **Judul Utama:** Buat judul yang lengkap dan letakkan di tengah. Contoh: "# KERANGKA ACUAN PROGRAM [Nama Program]\\n# PUSKESMAS [Nama Puskesmas] TAHUN [Tahun]".
                     2.  **Narasi Utuh:** Ubah semua data menjadi paragraf naratif. Jangan hanya menyalin data mentah. Contohnya, untuk latar belakang, ceritakan masalah yang ada secara mengalir.
-                    3.  **Rata Kiri-Kanan (Justify):** Semua paragraf harus diformat untuk rata kiri-kanan. (Meskipun Markdown tidak secara native mendukung justify, tulis narasinya seolah-olah akan ditampilkan seperti itu).
-                    4.  **Tabel Profesional:** Pastikan semua tabel (Kegiatan Pokok, Rincian Pelaksanaan, Jadwal) diformat dengan benar dalam Markdown. Tabel harus utuh dan jelas, bukan dalam format ASCII art yang aneh.
-                    5.  **Bahasa Formal:** Gunakan bahasa Indonesia yang formal, baku, dan profesional sesuai standar dokumen resmi.
+                    3.  **Rata Kiri-Kanan (Justify):** Semua paragraf harus diformat untuk rata kiri-kanan.
+                    4.  **Tabel Profesional:** Pastikan semua tabel diformat dengan benar dalam Markdown.
+                    5.  **Bahasa Formal:** Gunakan bahasa Indonesia yang formal, baku, dan profesional.
                     
-                    Mulai dokumen dengan judul, diikuti oleh Bab I sampai IX secara berurutan.`;
+                    Mulai dokumen dengan judul, diikuti oleh Bab I sampai IX secara berurutan. Gunakan '##' untuk judul BAB.`;
 
                     const result = await callGeminiAPI(prompt, apiKey);
                     setGeneratedMarkdown(result);
@@ -771,7 +641,7 @@
 
             return (
                 <div>
-                    {/* All form sections for Program Generator are here, unchanged */}
+                    {/* All form sections are unchanged */}
                     <div className="form-section">
                         <h2>Informasi Umum</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -782,7 +652,7 @@
                             <div className="md:col-span-2"><label className="form-label font-semibold">Nama Program</label><input type="text" className="form-input" value={namaProgram} onChange={e => setNamaProgram(e.target.value)} placeholder="Contoh: Peningkatan Mutu Program KIA" /></div>
                         </div>
                     </div>
-                    
+                    {/* ... other form sections ... */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>I. Pendahuluan</h2><AiButton onClick={() => handleGenerateSection('pendahuluan')} isLoading={isLoading.pendahuluan} /></div>
                         <textarea className="form-textarea" rows="3" value={pendahuluan} onChange={e => setPendahuluan(e.target.value)} placeholder="Jelaskan hal-hal umum terkait program..."></textarea>
@@ -922,10 +792,10 @@
                     {generatedMarkdown && (
                         <div className="mt-8 bg-gray-800 text-white p-6 rounded-xl">
                             <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-2xl font-bold text-green-400">Hasil</h2>
+                                <h2 className="text-2xl font-bold text-green-400">Hasil Dokumen</h2>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handlePrintAndSaveAsPdf(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Cetak / Simpan PDF</button>
-                                    <button onClick={() => handleDownloadDocx(generatedMarkdown, `KAP - ${namaProgram}`)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Unduh DOCX</button>
+                                    <button onClick={() => handlePrintInNewTab(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Buka Halaman Cetak</button>
+                                    <button onClick={() => handleCopyToClipboard(generatedMarkdown, showToast)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Salin Teks</button>
                                 </div>
                             </div>
                             <pre className="whitespace-pre-wrap break-words bg-gray-900 p-4 rounded-md text-sm leading-relaxed">{generatedMarkdown}</pre>
@@ -935,8 +805,9 @@
             );
         };
 
-        // --- Generator for Kerangka Acuan KEGIATAN (Unchanged) ---
+        // --- Generator for Kerangka Acuan KEGIATAN (MODIFIED to use new export buttons) ---
         const KerangkaAcuanKegiatanGenerator = ({ apiKey, showToast }) => {
+            // All state declarations remain the same...
             const [namaPuskesmas, setNamaPuskesmas] = useState('');
             const [tahun, setTahun] = useState(new Date().getFullYear().toString());
             const [namaKegiatan, setNamaKegiatan] = useState('');
@@ -956,6 +827,7 @@
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
+            // All handleGenerateSection and other logic functions remain the same...
             const handleListChange = (setter, list, id, value) => setter(list.map(item => item.id === id ? { ...item, text: value } : item));
             const addListItem = (setter, list) => setter([...list, {id: Date.now(), text: ''}]);
             const removeListItem = (setter, list, id) => setter(list.filter(item => item.id !== id));
@@ -1049,8 +921,8 @@
                     ${JSON.stringify(allData, null, 2)}
 
                     **Instruksi Pemformatan dan Narasi:**
-                    1.  **Judul Utama:** Buat judul yang lengkap dan letakkan di tengah. Contoh: "# KERANGKA ACUAN KEGIATAN [Nama Kegiatan]\\n## PUSKESMAS [Nama Puskesmas] TAHUN [Tahun]".
-                    2.  **Struktur KAK:** Ikuti struktur KAK standar: A. Pendahuluan, B. Latar Belakang, C. Tujuan (1. Tujuan Umum, 2. Tujuan Khusus), D. Kegiatan Pokok dan Rincian Kegiatan, E. Cara Melaksanakan Kegiatan, F. Sasaran, G. Jadwal Pelaksanaan Kegiatan, H. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya, I. Pencatatan, Pelaporan, dan Evaluasi Kegiatan.
+                    1.  **Judul Utama:** Buat judul yang lengkap dan letakkan di tengah. Contoh: "# KERANGKA ACUAN KEGIATAN [Nama Kegiatan]\\n# PUSKESMAS [Nama Puskesmas] TAHUN [Tahun]".
+                    2.  **Struktur KAK:** Ikuti struktur KAK standar: A. Pendahuluan, B. Latar Belakang, C. Tujuan (1. Tujuan Umum, 2. Tujuan Khusus), D. Kegiatan Pokok dan Rincian Kegiatan, E. Cara Melaksanakan Kegiatan, F. Sasaran, G. Jadwal Pelaksanaan Kegiatan, H. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya, I. Pencatatan, Pelaporan, dan Evaluasi Kegiatan. Gunakan '##' untuk judul bagian (A, B, C, dst.).
                     3.  **Narasi Utuh:** Ubah semua data menjadi paragraf naratif. Jangan hanya menyalin data mentah.
                     4.  **Rata Kiri-Kanan (Justify):** Semua paragraf harus diformat untuk rata kiri-kanan.
                     5.  **Tabel Profesional:** Buat tabel jadwal kegiatan dalam format Markdown yang benar dan utuh.
@@ -1075,6 +947,7 @@
 
             return (
                 <div>
+                    {/* Form sections for KAK Generator */}
                     <div className="form-section">
                         <h2>Informasi Umum</h2>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1083,8 +956,8 @@
                             <div className="md:col-span-2"><label className="form-label font-semibold">Nama Kegiatan</label><input type="text" className="form-input" value={namaKegiatan} onChange={e => setNamaKegiatan(e.target.value)} placeholder="Contoh: Kelas Ibu Hamil di Desa Sukamaju" /></div>
                         </div>
                     </div>
-
-                    <div className="form-section">
+                    {/* ... other form sections ... */}
+                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>A. Pendahuluan</h2><AiButton onClick={() => handleGenerateSection('pendahuluan')} isLoading={isLoading.pendahuluan} /></div>
                         <textarea className="form-textarea" rows="3" value={pendahuluan} onChange={e => setPendahuluan(e.target.value)}></textarea>
                     </div>
@@ -1161,10 +1034,10 @@
                     {generatedMarkdown && (
                         <div className="mt-8 bg-gray-800 text-white p-6 rounded-xl">
                             <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-2xl font-bold text-green-400">Hasil</h2>
+                                <h2 className="text-2xl font-bold text-green-400">Hasil Dokumen</h2>
                                 <div className="flex gap-2">
-                                    <button onClick={() => handlePrintAndSaveAsPdf(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Cetak / Simpan PDF</button>
-                                    <button onClick={() => handleDownloadDocx(generatedMarkdown, `KAK - ${namaKegiatan}`)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Unduh DOCX</button>
+                                    <button onClick={() => handlePrintInNewTab(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Buka Halaman Cetak</button>
+                                    <button onClick={() => handleCopyToClipboard(generatedMarkdown, showToast)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Salin Teks</button>
                                 </div>
                             </div>
                             <pre className="whitespace-pre-wrap break-words bg-gray-900 p-4 rounded-md text-sm leading-relaxed">{generatedMarkdown}</pre>
