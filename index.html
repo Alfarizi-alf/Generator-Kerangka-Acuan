@@ -153,17 +153,20 @@
          * @param {string} prompt - The text prompt for the AI.
          * @param {string} apiKey - The API key for Google AI Studio.
          * @param {boolean} isJson - True if the expected response is JSON, false otherwise.
+         * @param {number} [temperature=0.9] - Controls the randomness of the output. Lower values (e.g., 0.2) make it more focused, higher values (e.g., 1.0) make it more creative.
          * @returns {Promise<string|object>} The generated text or parsed JSON object.
          * @throws {Error} If the API call fails or returns an unexpected format.
          */
-        const callGeminiAPI = async (prompt, apiKey, isJson = false) => {
+        const callGeminiAPI = async (prompt, apiKey, isJson = false, temperature = 0.9) => {
             const effectiveApiKey = apiKey || "";
             const model = 'gemini-2.0-flash';
             const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveApiKey}`;
             
             const payload = {
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
-                generationConfig: {}
+                generationConfig: {
+                    temperature: temperature // Set the temperature here
+                }
             };
 
             if (isJson) {
@@ -436,6 +439,7 @@
             const [pencatatan, setPencatatan] = useState('');
             const [generatedMarkdown, setGeneratedMarkdown] = useState('');
             const [isLoading, setIsLoading] = useState({});
+            const [generationTemperature, setGenerationTemperature] = useState(0.9); // New state for temperature
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -465,27 +469,27 @@
                     switch(section) {
                         case 'pendahuluan':
                             prompt = `Buatkan paragraf pendahuluan ${context}. Jelaskan secara umum pentingnya program ini dalam konteks pelayanan kesehatan.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setPendahuluan(result);
                             break;
                         case 'pengorganisasian':
                             prompt = `Buatkan draf struktur pengorganisasian sederhana ${context}. Tuliskan dalam format teks dengan daftar peran seperti Pelindung, Penanggung Jawab, Ketua Tim, dan Pelaksana, masing-masing di baris baru.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setPengorganisasian(result);
                             break;
                         case 'tataHubunganKerja':
                             prompt = `Buatkan draf untuk bagian "Tata Hubungan Kerja" ${orgContext}. Jelaskan alur koordinasi dan komunikasi antar peran yang ada.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setTataHubunganKerja(result);
                             break;
                         case 'pelaporan':
                             prompt = `Buatkan draf untuk bagian "Alur Pelaporan" ${orgContext}. Jelaskan bagaimana pelaporan dilakukan, dari siapa, kepada siapa, dan kapan.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setPelaporan(result);
                             break;
                         case 'tujuan':
                             prompt = `Buatkan satu tujuan umum dan tiga tujuan khusus ${context}. Format output sebagai JSON dengan key "umum" (string) dan "khusus" (array of strings).`;
-                            result = await callGeminiAPI(prompt, apiKey, true);
+                            result = await callGeminiAPI(prompt, apiKey, true, generationTemperature); // Pass temperature
                             if (result && result.umum && Array.isArray(result.khusus)) {
                                 setTujuanUmum(result.umum);
                                 setTujuanKhusus(result.khusus.map((text, i) => ({id: i+1, text})));
@@ -493,24 +497,24 @@
                             break;
                         case 'caraMelaksanakanUmum':
                             prompt = `Buatkan draf satu paragraf untuk bagian "Cara melaksanakan kegiatan" secara umum ${prioritasContext}. Jelaskan bagaimana siklus PDCA dipakai untuk menjelaskan kegiatan yang dibuat untuk mengatasi akar masalah prioritas.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setCaraMelaksanakanUmum(result);
                             break;
                         case 'sasaranUmum':
                             prompt = `Buatkan daftar 5-8 poin sasaran umum yang spesifik dan terukur ${kegiatanContext}. Format sebagai JSON array of strings.`;
-                            result = await callGeminiAPI(prompt, apiKey, true);
+                            result = await callGeminiAPI(prompt, apiKey, true, generationTemperature); // Pass temperature
                             if (Array.isArray(result)) {
                                  setSasaranUmum(result.map((text, i) => ({id: i+1, text})));
                              }
                             break;
                         case 'evaluasi':
                             prompt = `Buatkan paragraf untuk bagian "Evaluasi Pelaksanaan Kegiatan dan Pelaporannya" ${context}. Jelaskan kapan evaluasi dilakukan dan bagaimana pelaporannya.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setEvaluasi(result);
                             break;
                         case 'pencatatan':
                             prompt = `Buatkan paragraf untuk bagian "Pencatatan, Pelaporan dan Evaluasi Kegiatan" ${context}. Jelaskan bagaimana pencatatan, pelaporan, dan evaluasi kegiatan secara menyeluruh dilakukan.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setPencatatan(result);
                             break;
                     }
@@ -520,7 +524,7 @@
                 } finally {
                     setIsLoading(prev => ({ ...prev, [section]: false }));
                 }
-            }, [namaProgram, apiKey, showToast, namaPuskesmas, pengorganisasian, kegiatanPokok, topPriorities]);
+            }, [namaProgram, apiKey, showToast, namaPuskesmas, pengorganisasian, kegiatanPokok, topPriorities, generationTemperature]); // Add generationTemperature to dependencies
 
             // Function to generate root causes for a specific problem
             const handleGenerateRootCauses = useCallback(async (masalahId) => {
@@ -536,7 +540,7 @@
                 setIsLoading(prev => ({...prev, [`rootCause-${masalahId}`]: true}));
                 try {
                     const prompt = `Sebutkan 5 kemungkinan akar masalah untuk masalah berikut di sebuah puskesmas: "${currentMasalah.text}". Berikan jawaban dalam format JSON array of strings.`;
-                    const result = await callGeminiAPI(prompt, apiKey, true);
+                    const result = await callGeminiAPI(prompt, apiKey, true, generationTemperature); // Pass temperature
                     if (Array.isArray(result)) {
                         const newRootCauses = result.map(text => ({ id: Date.now() + Math.random(), text, U: 1, S: 1, G: 1 }));
                         setMasalah(prev => prev.map(m => m.id === masalahId ? {...m, rootCauses: [...(m.rootCauses || []), ...newRootCauses]} : m));
@@ -547,7 +551,7 @@
                 } finally {
                     setIsLoading(prev => ({...prev, [`rootCause-${masalahId}`]: false}));
                 }
-            }, [masalah, apiKey, showToast]);
+            }, [masalah, apiKey, showToast, generationTemperature]); // Add generationTemperature to dependencies
 
             // Function to analyze priorities based on USG matrix
             const handleAnalyzePriorities = () => {
@@ -588,7 +592,7 @@
                 try {
                     const priorityDescriptions = topPriorities.map(p => p.topRootCause.text).join(', ');
                     const prompt = `Berdasarkan akar masalah prioritas berikut: "${priorityDescriptions}", buatkan daftar Kegiatan Pokok dan Rincian Kegiatannya untuk program "${namaProgram}". Format sebagai JSON array, setiap objek memiliki key "nama" (kegiatan pokok) dan "rincian" (array of strings untuk rinciannya).`;
-                    const result = await callGeminiAPI(prompt, apiKey, true);
+                    const result = await callGeminiAPI(prompt, apiKey, true, generationTemperature); // Pass temperature
                     if (Array.isArray(result)) {
                         setKegiatanPokok(result.map((kp, i) => ({ id: i + 1, nama: kp.nama, rincian: kp.rincian.map((r, j) => ({ id: j + 1, text: r })) })));
                         showToast('Kegiatan Pokok berhasil dibuat berdasarkan prioritas.');
@@ -598,7 +602,7 @@
                 } finally {
                     setIsLoading(prev => ({...prev, kegiatanFromPrio: false}));
                 }
-            }, [topPriorities, namaProgram, apiKey, showToast]);
+            }, [topPriorities, namaProgram, apiKey, showToast, generationTemperature]); // Add generationTemperature to dependencies
 
             // Function to generate detailed implementation table
             const handleGenerateRincianPelaksanaan = useCallback(async () => {
@@ -613,7 +617,7 @@
                 setIsLoading(prev => ({ ...prev, rincianPelaksanaan: true }));
                 try {
                     const prompt = `Berdasarkan daftar Kegiatan Pokok berikut: ${JSON.stringify(kegiatanPokok)}. Untuk setiap kegiatan pokok, buatkan 'sasaran_umum' yang relevan. Kemudian, untuk setiap 'rincian' di dalam setiap kegiatan pokok, buatkan 'sasaran' spesifik (target terukur) dan 'cara_melaksanakan_kegiatan' (metode pelaksanaan). Format output sebagai JSON array. Setiap objek dalam array mewakili satu kegiatan pokok dan harus memiliki properti 'kegiatan_pokok', 'sasaran_umum', dan 'rincian_data' (array of objects). Setiap objek dalam 'rincian_data' harus memiliki 'rincian_kegiatan', 'sasaran', dan 'cara_melaksanakan_kegiatan'.`;
-                    const result = await callGeminiAPI(prompt, apiKey, true);
+                    const result = await callGeminiAPI(prompt, apiKey, true, generationTemperature); // Pass temperature
                     setRincianPelaksanaan(result);
                     showToast('Tabel Rincian Pelaksanaan berhasil dibuat oleh AI.');
                 } catch(error) {
@@ -621,7 +625,7 @@
                 } finally {
                     setIsLoading(prev => ({ ...prev, rincianPelaksanaan: false }));
                 }
-            }, [kegiatanPokok, apiKey, showToast]);
+            }, [kegiatanPokok, apiKey, showToast, generationTemperature]); // Add generationTemperature to dependencies
 
             // Main function to generate the complete program framework document
             const handleGenerate = useCallback(async () => {
@@ -652,7 +656,7 @@
                     
                     Mulai dokumen dengan judul, diikuti oleh Bab I sampai IX secara berurutan. Gunakan '##' untuk judul BAB.`;
 
-                    const result = await callGeminiAPI(prompt, apiKey);
+                    const result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                     setGeneratedMarkdown(result);
                     showToast("Kerangka Acuan Program berhasil dibuat!");
 
@@ -665,8 +669,8 @@
                 namaPuskesmas, kecamatan, kabupaten, tahun, namaProgram, pendahuluan,
                 masalah, topPriorities, pengorganisasian, tataHubunganKerja, pelaporan,
                 tujuanUmum, tujuanKhusus, kegiatanPokok, caraMelaksanakanUmum,
-                sasaranUmum, rincianPelaksanaan, jadwal, evaluasi, pencatatan, apiKey, showToast
-            ]);
+                sasaranUmum, rincianPelaksanaan, jadwal, evaluasi, pencatatan, apiKey, showToast, generationTemperature
+            ]); // Add generationTemperature to dependencies
             
             // Helper functions for managing lists (problems, root causes, etc.)
             const addMasalah = () => setMasalah(prev => [...prev, {id: Date.now(), text: '', rootCauses: []}]);
@@ -693,6 +697,21 @@
                             <div><label className="form-label">Kabupaten/Kota</label><input type="text" className="form-input" value={kabupaten} onChange={e => setKabupaten(e.target.value)} /></div>
                             <div className="md:col-span-2"><label className="form-label font-semibold">Nama Program</label><input type="text" className="form-input" value={namaProgram} onChange={e => setNamaProgram(e.target.value)} placeholder="Contoh: Peningkatan Mutu Program KIA" /></div>
                         </div>
+                    </div>
+                    {/* New section for Temperature control */}
+                    <div className="form-section">
+                        <h2>Pengaturan AI</h2>
+                        <label className="form-label">Suhu Generasi AI (Temperature)</label>
+                        <input 
+                            type="range" 
+                            min="0.0" 
+                            max="1.0" 
+                            step="0.1" 
+                            value={generationTemperature} 
+                            onChange={e => setGenerationTemperature(Number(e.target.value))} 
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg dark:bg-gray-700"
+                        />
+                        <p className="text-sm text-gray-600 mt-2">Nilai: {generationTemperature.toFixed(1)} (0.0 = Lebih Konsisten, 1.0 = Lebih Kreatif)</p>
                     </div>
                     {/* Bab I. Pendahuluan Section */}
                     <div className="form-section">
@@ -810,7 +829,6 @@
                             </table>
                         </div>
                     </div>
-                    {/* Bab VII. Jadwal Kegiatan Section */}
                     <div className="form-section">
                         <h2>VII. Jadwal Kegiatan</h2>
                         <div className="overflow-x-auto">
@@ -824,12 +842,10 @@
                             </table>
                         </div>
                     </div>
-                    {/* Bab VIII. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>VIII. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya</h2><AiButton onClick={() => handleGenerateSection('evaluasi')} isLoading={isLoading.evaluasi} /></div>
                         <textarea className="form-textarea" rows="3" value={evaluasi} onChange={e => setEvaluasi(e.target.value)} placeholder="Jelaskan kapan evaluasi dilakukan dan bagaimana pelaporannya..."></textarea>
                     </div>
-                    {/* Bab IX. Pencatatan, Pelaporan dan Evaluasi Kegiatan Section */}
                     <div className="form-section">
                         <div className="flex justify-between items-center"><h2>IX. Pencatatan, Pelaporan dan Evaluasi Kegiatan</h2><AiButton onClick={() => handleGenerateSection('pencatatan')} isLoading={isLoading.pencatatan} /></div>
                         <textarea className="form-textarea" rows="3" value={pencatatan} onChange={e => setPencatatan(e.target.value)} placeholder="Jelaskan bagaimana pencatatan, pelaporan, dan evaluasi kegiatan secara menyeluruh..."></textarea>
@@ -874,6 +890,7 @@
             const [pencatatan, setPencatatan] = useState('');
             const [generatedMarkdown, setGeneratedMarkdown] = useState('');
             const [isLoading, setIsLoading] = useState({});
+            const [generationTemperature, setGenerationTemperature] = useState(0.9); // New state for temperature
 
             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
@@ -905,17 +922,17 @@
                     switch(section) {
                         case 'pendahuluan':
                             prompt = `Buatkan satu paragraf pendahuluan ${context}. Jelaskan secara singkat apa kegiatan ini dan mengapa penting.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setPendahuluan(result);
                             break;
                         case 'latarBelakang':
                             prompt = `Buatkan satu atau dua paragraf latar belakang ${context}. Jelaskan alasan atau data yang mendasari perlunya kegiatan ini dilaksanakan.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setLatarBelakang(result);
                             break;
                         case 'tujuan':
                             prompt = `Buatkan satu tujuan umum dan tiga tujuan khusus ${context}. Format output sebagai JSON dengan key "umum" (string) dan "khusus" (array of strings).`;
-                            result = await callGeminiAPI(prompt, apiKey, true);
+                            result = await callGeminiAPI(prompt, apiKey, true, generationTemperature); // Pass temperature
                             if (result && result.umum && Array.isArray(result.khusus)) {
                                 setTujuanUmum(result.umum);
                                 setTujuanKhusus(result.khusus.map((text, i) => ({id: i+1, text})));
@@ -923,7 +940,7 @@
                             break;
                         case 'kegiatan':
                             prompt = `Buatkan daftar 2-3 kegiatan pokok dan 3-5 rincian kegiatan ${context}. Format sebagai JSON dengan key "pokok" (array of strings) dan "rincian" (array of strings).`;
-                            result = await callGeminiAPI(prompt, apiKey, true);
+                            result = await callGeminiAPI(prompt, apiKey, true, generationTemperature); // Pass temperature
                             if (result && Array.isArray(result.pokok) && Array.isArray(result.rincian)) {
                                 setKegiatanPokok(result.pokok.map((text, i) => ({id: i+1, text})));
                                 setRincianKegiatan(result.rincian.map((text, i) => ({id: i+1, text})));
@@ -931,22 +948,22 @@
                             break;
                         case 'caraMelaksanakan':
                             prompt = `Jelaskan secara naratif metode atau cara pelaksanaan untuk kegiatan "${namaKegiatan}". Contoh: penyuluhan dengan ceramah dan tanya jawab, demonstrasi, kunjungan lapangan, dll.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setCaraMelaksanakan(result);
                             break;
                         case 'sasaran':
                             prompt = `Sebutkan sasaran atau target peserta/penerima manfaat dari kegiatan "${namaKegiatan}". Buat dalam bentuk daftar poin.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setSasaran(result);
                             break;
                         case 'evaluasi':
                             prompt = `Buatkan paragraf untuk bagian "Evaluasi Pelaksanaan Kegiatan dan Pelaporan" ${context}. Jelaskan bagaimana dan kapan evaluasi dilakukan serta kepada siapa hasilnya dilaporkan.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setEvaluasi(result);
                             break;
                         case 'pencatatan':
                             prompt = `Buatkan paragraf untuk bagian "Pencatatan, Pelaporan, dan Evaluasi Kegiatan" ${context}. Jelaskan dokumen apa yang dicatat, bagaimana alur pelaporannya, dan bagaimana evaluasi akhir dilakukan.`;
-                            result = await callGeminiAPI(prompt, apiKey);
+                            result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                             setPencatatan(result);
                             break;
                     }
@@ -956,7 +973,7 @@
                 } finally {
                     setIsLoading(prev => ({ ...prev, [section]: false }));
                 }
-            }, [namaKegiatan, namaPuskesmas, apiKey, showToast]);
+            }, [namaKegiatan, namaPuskesmas, apiKey, showToast, generationTemperature]); // Add generationTemperature to dependencies
 
             // Main function to generate the complete activity framework document
             const handleGenerate = useCallback(async () => {
@@ -987,7 +1004,7 @@
                     
                     Mulai dokumen dengan judul, diikuti oleh setiap bagian (A, B, C, dst.) secara berurutan.`;
 
-                    const result = await callGeminiAPI(prompt, apiKey);
+                    const result = await callGeminiAPI(prompt, apiKey, false, generationTemperature); // Pass temperature
                     setGeneratedMarkdown(result);
                     showToast("Kerangka Acuan Kegiatan berhasil dibuat!");
 
@@ -999,8 +1016,8 @@
             }, [
                 namaPuskesmas, tahun, namaKegiatan, pendahuluan, latarBelakang,
                 tujuanUmum, tujuanKhusus, kegiatanPokok, rincianKegiatan,
-                caraMelaksanakan, sasaran, jadwal, evaluasi, pencatatan, apiKey, showToast
-            ]);
+                caraMelaksanakan, sasaran, jadwal, evaluasi, pencatatan, apiKey, showToast, generationTemperature
+            ]); // Add generationTemperature to dependencies
 
             return (
                 <div>
@@ -1012,6 +1029,21 @@
                             <div><label className="form-label">Tahun</label><input type="number" className="form-input" value={tahun} onChange={e => setTahun(e.target.value)} /></div>
                             <div className="md:col-span-2"><label className="form-label font-semibold">Nama Kegiatan</label><input type="text" className="form-input" value={namaKegiatan} onChange={e => setNamaKegiatan(e.target.value)} placeholder="Contoh: Kelas Ibu Hamil di Desa Sukamaju" /></div>
                         </div>
+                    </div>
+                    {/* New section for Temperature control */}
+                    <div className="form-section">
+                        <h2>Pengaturan AI</h2>
+                        <label className="form-label">Suhu Generasi AI (Temperature)</label>
+                        <input 
+                            type="range" 
+                            min="0.0" 
+                            max="1.0" 
+                            step="0.1" 
+                            value={generationTemperature} 
+                            onChange={e => setGenerationTemperature(Number(e.target.value))} 
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-lg dark:bg-gray-700"
+                        />
+                        <p className="text-sm text-gray-600 mt-2">Nilai: {generationTemperature.toFixed(1)} (0.0 = Lebih Konsisten, 1.0 = Lebih Kreatif)</p>
                     </div>
                     {/* A. Pendahuluan Section */}
                      <div className="form-section">
