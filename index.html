@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Generator Kerangka Acuan (Narasi & Logika Lengkap)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Libraries for DOCX generation and Markdown parsing -->
+    <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f6;
+        }
+        .tab-button.active {
+            border-bottom: 3px solid #1d4ed8;
+            color: #1d4ed8;
+            font-weight: 600;
+        }
+        .form-section {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+        }
+        .form-section h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 0.5rem;
+        }
+        .form-label {
+            display: block;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 0.5rem;
+        }
+        .form-input, .form-textarea, .form-select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            box-shadow: inset 0 1px 2px 0 rgba(0,0,0,0.05);
+        }
+        .form-input:focus, .form-textarea:focus, .form-select:focus {
+            outline: 2px solid transparent;
+            outline-offset: 2px;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 0.75rem 1.5rem;
+            background-color: #1d4ed8;
+            color: white;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #1e40af;
+        }
+        .btn-primary:disabled {
+            background-color: #93c5fd;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            padding: 0.5rem 1rem;
+            background-color: #6b7280;
+            color: white;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: #4b5563;
+        }
+        .btn-ai {
+            padding: 0.5rem 1rem;
+            background-color: #818cf8;
+            color: white;
+            font-weight: 500;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .btn-ai:hover:not(:disabled) {
+            background-color: #6366f1;
+        }
+        .btn-ai:disabled {
+            background-color: #a5b4fc;
+            cursor: not-allowed;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background-color: #2d3748;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .toast.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .loader {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // --- AI Generation & Utility Functions ---
+        const callGeminiAPI = async (prompt, apiKey, isJson = false) => {
+            const effectiveApiKey = apiKey || "";
+            const model = 'gemini-2.0-flash';
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${effectiveApiKey}`;
+            
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                generationConfig: {}
+            };
+
+            if (isJson) {
+                payload.generationConfig.responseMimeType = "application/json";
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.json();
+                    throw new Error(errorBody.error?.message || 'Unknown API error');
+                }
+
+                const result = await response.json();
+                if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    if (isJson) {
+                         const sanitizedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                         return JSON.parse(sanitizedText);
+                    }
+                    return text;
+                } else {
+                    if (result.promptFeedback && result.promptFeedback.blockReason) {
+                         throw new Error(`Request blocked: ${result.promptFeedback.blockReason}`);
+                    }
+                    throw new Error('No content generated or unexpected response format.');
+                }
+            } catch (error) {
+                console.error('Error calling Gemini API:', error);
+                throw error;
+            }
+        };
+
+
+        // --- Helper Components ---
+        const AddButton = ({ onClick, children }) => (
+            <button type="button" onClick={onClick} className="mt-2 text-sm text-blue-600 hover:underline font-medium">
+                {children}
+            </button>
+        );
+
+        const RemoveButton = ({ onClick }) => (
+            <button type="button" onClick={onClick} className="ml-2 px-2 py-1 text-xs text-red-700 bg-red-100 hover:bg-red-200 rounded">
+                Hapus
+            </button>
+        );
+        
+        const AiButton = ({ onClick, isLoading, children }) => (
+            <button type="button" onClick={onClick} disabled={isLoading} className="btn-ai">
+                {isLoading ? <div className="loader"></div> : '✨'}
+                <span>{isLoading ? 'Generating...' : (children || 'Generate with AI')}</span>
+            </button>
+        );
+        
+        // --- Download and Print Functions ---
+        const handlePrintAndSaveAsPdf = (markdownContent) => {
+            const htmlContent = marked.parse(markdownContent);
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                    <head>
+                        <title>Cetak Dokumen</title>
+                        <style>
+                            @page {
+                                size: A4;
+                                margin: 1in;
+                            }
+                            body {
+                                font-family: 'Times New Roman', Times, serif;
+                                font-size: 12pt;
+                                line-height: 1.5;
+                            }
+                            p, li {
+                                text-align: justify;
+                                widows: 3;
+                                orphans: 3;
+                            }
+                            h1, h2, h3, h4 {
+                                font-family: 'Times New Roman', Times, serif;
+                                page-break-after: avoid;
+                            }
+                            h1 { text-align: center; }
+                            h2 { text-align: left; }
+                            table {
+                                width: 100%;
+                                border-collapse: collapse;
+                                font-size: 11pt;
+                                page-break-inside: avoid;
+                            }
+                            th, td {
+                                border: 1px solid black;
+                                padding: 5px;
+                                text-align: left;
+                            }
+                            th {
+                                background-color: #f2f2f2;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${htmlContent}
+                    </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            // Use a timeout to ensure content is loaded before printing
+            setTimeout(() => {
+                printWindow.print();
+                printWindow.close();
+            }, 500);
+        };
+
+        const handleDownloadDocx = (markdownContent, fileName) => {
+            try {
+                const { Document, Packer, Paragraph, TextRun, Table, TableCell, TableRow, WidthType, AlignmentType, HeadingLevel, PageMargin, PageSize } = docx;
+                
+                const markdownToDocxChildren = (markdown) => {
+                    const lines = markdown.split('\n');
+                    const children = [];
+                    let inTable = false;
+                    let tableHeader = [];
+                    let tableRows = [];
+
+                    lines.forEach((line, index) => {
+                        line = line.trim();
+
+                        if (line.startsWith('|')) {
+                            const cells = line.split('|').slice(1, -1).map(cell => cell.trim());
+                            if (!inTable) { // This is the header row
+                                inTable = true;
+                                tableHeader = cells;
+                                // The next line is the separator, so we skip it in the next iteration
+                            } else if (!cells.every(cell => /^-+$/.test(cell))) { // Not a separator line
+                                tableRows.push(new TableRow({
+                                    children: cells.map(cellContent => new TableCell({
+                                        children: [new Paragraph({ 
+                                            children: [new TextRun(cellContent)],
+                                            alignment: AlignmentType.LEFT,
+                                        })],
+                                        width: { size: 4535, type: WidthType.AUTO },
+                                    })),
+                                }));
+                            }
+                        } else {
+                            if (inTable) {
+                                children.push(new Table({
+                                    rows: [
+                                        new TableRow({
+                                            children: tableHeader.map(headerText => new TableCell({
+                                                children: [new Paragraph({ children: [new TextRun({text: headerText, bold: true})], alignment: AlignmentType.CENTER })],
+                                                width: { size: 4535, type: WidthType.AUTO },
+                                            })),
+                                            isHeader: true,
+                                        }),
+                                        ...tableRows
+                                    ],
+                                    width: { size: 100, type: WidthType.PERCENTAGE },
+                                }));
+                                inTable = false;
+                                tableRows = [];
+                                tableHeader = [];
+                            }
+
+                            if (line.startsWith('# ')) {
+                                children.push(new Paragraph({ text: line.substring(2), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }));
+                            } else if (line.startsWith('## ')) {
+                                children.push(new Paragraph({ text: line.substring(3), heading: HeadingLevel.HEADING_2 }));
+                            } else if (line.startsWith('### ')) {
+                                children.push(new Paragraph({ text: line.substring(4), heading: HeadingLevel.HEADING_3 }));
+                            } else if (line.startsWith('- ') || line.startsWith('* ')) {
+                                children.push(new Paragraph({ text: line.substring(2), bullet: { level: 0 } }));
+                            } else if (line.match(/^\d+\.\s/)) {
+                                children.push(new Paragraph({ text: line.replace(/^\d+\.\s/, ''), numberId: 1, level: 0 }));
+                            } else if (line.trim().length > 0) {
+                                children.push(new Paragraph({ children: [new TextRun(line)], alignment: AlignmentType.JUSTIFIED }));
+                            }
+                        }
+                    });
+
+                    if (inTable) {
+                         children.push(new Table({
+                            rows: [
+                                new TableRow({
+                                    children: tableHeader.map(headerText => new TableCell({
+                                        children: [new Paragraph({ children: [new TextRun({text: headerText, bold: true})], alignment: AlignmentType.CENTER })],
+                                    })),
+                                    isHeader: true,
+                                }),
+                                ...tableRows
+                            ],
+                            width: { size: 100, type: WidthType.PERCENTAGE },
+                        }));
+                    }
+                    return children;
+                };
+
+                const doc = new Document({
+                    styles: {
+                        default: {
+                            document: {
+                                run: {
+                                    size: "12pt",
+                                    font: "Times New Roman",
+                                },
+                            },
+                        },
+                    },
+                    sections: [{
+                        properties: {
+                            pageSize: {
+                                width: PageSize.A4.width,
+                                height: PageSize.A4.height,
+                                orientation: PageSize.A4.orientation,
+                            },
+                            page: {
+                                margin: {
+                                    top: 1440, right: 1440, bottom: 1440, left: 1440, // 1 inch = 1440 twips
+                                },
+                            },
+                        },
+                        children: markdownToDocxChildren(markdownContent),
+                    }],
+                });
+
+                Packer.toBlob(doc).then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `${fileName}.docx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                }).catch(err => {
+                    console.error("Error packing DOCX:", err);
+                    alert("Gagal membuat file DOCX.");
+                });
+            } catch (error) {
+                console.error("Error creating DOCX:", error);
+                alert("Gagal memproses file DOCX.");
+            }
+        };
+
+
+        // --- Main Application Component ---
+        const App = () => {
+            const [apiKey, setApiKey] = useState('');
+            const [apiKeyEntered, setApiKeyEntered] = useState(false);
+            const [activeTab, setActiveTab] = useState('program');
+            const [toastMessage, setToastMessage] = useState('');
+
+            const showToast = (message) => {
+                setToastMessage(message);
+                setTimeout(() => setToastMessage(''), 3000);
+            };
+
+            const handleApiKeySubmit = () => {
+                if (apiKey.trim() !== '') {
+                    setApiKeyEntered(true);
+                    showToast('API Key diterima. Selamat datang!');
+                } else {
+                    setApiKeyEntered(true);
+                    showToast('Anda melanjutkan tanpa API Key. Fitur AI tidak akan aktif.');
+                }
+            };
+            
+            useEffect(() => {
+                if (typeof __initial_api_key !== 'undefined' && __initial_api_key) {
+                    setApiKey(__initial_api_key);
+                    setApiKeyEntered(true);
+                    showToast('API Key ditemukan. Selamat datang!');
+                }
+            }, []);
+
+            if (!apiKeyEntered) {
+                return (
+                    <div className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
+                        <div className="max-w-md w-full mx-auto bg-white p-8 rounded-xl shadow-lg text-center">
+                            <h1 className="text-2xl font-bold text-blue-700 mb-6">Selamat Datang di Portal Generator Kerangka Acuan</h1>
+                            <p className="mb-4 text-gray-700">Untuk mengaktifkan fitur AI, mohon masukkan kunci API Anda. Anda dapat melanjutkan tanpa kunci, namun fitur AI tidak akan berfungsi.</p>
+                            <input
+                                type="password"
+                                className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-4"
+                                placeholder="Masukkan Google AI Studio API Key Anda (opsional)"
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                            />
+                            <button
+                                onClick={handleApiKeySubmit}
+                                className="w-full py-3 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 transition-colors duration-200"
+                            >
+                                Lanjutkan
+                            </button>
+                             <p className="mt-4 text-sm text-gray-600">
+                                Belum punya kunci API? Anda bisa mendapatkannya di <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google AI Studio</a>.
+                            </p>
+                        </div>
+                        {toastMessage && <div className="toast show">{toastMessage}</div>}
+                    </div>
+                );
+            }
+            
+            return (
+                <div className="min-h-screen">
+                    <div className="max-w-7xl mx-auto bg-white p-4 sm:p-6 md:p-8 rounded-b-xl shadow-lg mt-0">
+                        <div className="flex border-b border-gray-200 mb-6">
+                            <button
+                                className={`flex-1 py-3 px-4 text-center text-lg font-medium transition-colors duration-200 ${activeTab === 'program' ? 'tab-button active' : 'text-gray-500 hover:text-blue-600'}`}
+                                onClick={() => setActiveTab('program')}
+                            >
+                                Kerangka Acuan Program
+                            </button>
+                            <button
+                                className={`flex-1 py-3 px-4 text-center text-lg font-medium transition-colors duration-200 ${activeTab === 'kegiatan' ? 'tab-button active' : 'text-gray-500 hover:text-blue-600'}`}
+                                onClick={() => setActiveTab('kegiatan')}
+                            >
+                                Kerangka Acuan Kegiatan
+                            </button>
+                        </div>
+                        
+                        {activeTab === 'program' && <KerangkaAcuanProgramGenerator apiKey={apiKey} showToast={showToast} />}
+                        {activeTab === 'kegiatan' && <KerangkaAcuanKegiatanGenerator apiKey={apiKey} showToast={showToast} />}
+                    </div>
+                    {toastMessage && <div className="toast show">{toastMessage}</div>}
+                </div>
+            );
+        };
+
+        // --- Generator for Kerangka Acuan PROGRAM ---
+        const KerangkaAcuanProgramGenerator = ({ apiKey, showToast }) => {
+            const [namaPuskesmas, setNamaPuskesmas] = useState('');
+            const [kecamatan, setKecamatan] = useState('');
+            const [kabupaten, setKabupaten] = useState('');
+            const [tahun, setTahun] = useState(new Date().getFullYear().toString());
+            const [namaProgram, setNamaProgram] = useState('');
+            const [pendahuluan, setPendahuluan] = useState('');
+            const [masalah, setMasalah] = useState([{ id: 1, text: '', rootCauses: [] }]);
+            const [pilihanPrioritas, setPilihanPrioritas] = useState('');
+            const [topPriorities, setTopPriorities] = useState([]);
+            const [pengorganisasian, setPengorganisasian] = useState('');
+            const [tataHubunganKerja, setTataHubunganKerja] = useState('');
+            const [pelaporan, setPelaporan] = useState('');
+            const [tujuanUmum, setTujuanUmum] = useState('');
+            const [tujuanKhusus, setTujuanKhusus] = useState([{id: 1, text: ''}]);
+            const [kegiatanPokok, setKegiatanPokok] = useState([{ id: 1, nama: '', rincian: [{ id: 1, text: '' }] }]);
+            const [caraMelaksanakanUmum, setCaraMelaksanakanUmum] = useState('Secara umum dalam pelaksanaan program mutu dan keselamatan pasien adalah mengikuti siklus Plan Do Check Action.');
+            const [sasaranUmum, setSasaranUmum] = useState([{id: 1, text: ''}]);
+            const [rincianPelaksanaan, setRincianPelaksanaan] = useState([]);
+            const [jadwal, setJadwal] = useState({});
+            const [evaluasi, setEvaluasi] = useState('');
+            const [pencatatan, setPencatatan] = useState('');
+            const [generatedMarkdown, setGeneratedMarkdown] = useState('');
+            const [isLoading, setIsLoading] = useState({});
+
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+
+            const handleGenerateSection = useCallback(async (section) => {
+                if (!apiKey) {
+                    showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
+                    return;
+                }
+                if (!namaProgram) {
+                    showToast(`Mohon isi Nama Program terlebih dahulu.`);
+                    return;
+                }
+                setIsLoading(prev => ({ ...prev, [section]: true }));
+                try {
+                    let prompt, result;
+                    const context = `untuk sebuah Kerangka Acuan Program berjudul "${namaProgram}" di ${namaPuskesmas || 'sebuah puskesmas'}.`;
+                    const orgContext = pengorganisasian ? `Berdasarkan struktur organisasi berikut: "${pengorganisasian}", dan ${context}` : context;
+                    const kegiatanContext = kegiatanPokok && kegiatanPokok.length > 0 && kegiatanPokok[0].nama ? `Berdasarkan kegiatan pokok berikut: ${JSON.stringify(kegiatanPokok)}, dan ${context}` : context;
+                    const prioritasContext = topPriorities && topPriorities.length > 0 ? `Berdasarkan akar masalah prioritas berikut: "${topPriorities.map(p => p.topRootCause.text).join(", ")}", dan ${kegiatanContext}`: kegiatanContext;
+
+                    switch(section) {
+                        case 'pendahuluan':
+                            prompt = `Buatkan paragraf pendahuluan ${context}. Jelaskan secara umum pentingnya program ini dalam konteks pelayanan kesehatan.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setPendahuluan(result);
+                            break;
+                        case 'pengorganisasian':
+                            prompt = `Buatkan draf struktur pengorganisasian sederhana ${context}. Tuliskan dalam format teks dengan daftar peran seperti Pelindung, Penanggung Jawab, Ketua Tim, dan Pelaksana, masing-masing di baris baru.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setPengorganisasian(result);
+                            break;
+                        case 'tataHubunganKerja':
+                            prompt = `Buatkan draf untuk bagian "Tata Hubungan Kerja" ${orgContext}. Jelaskan alur koordinasi dan komunikasi antar peran yang ada.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setTataHubunganKerja(result);
+                            break;
+                        case 'pelaporan':
+                            prompt = `Buatkan draf untuk bagian "Alur Pelaporan" ${orgContext}. Jelaskan bagaimana pelaporan dilakukan, dari siapa, kepada siapa, dan kapan.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setPelaporan(result);
+                            break;
+                        case 'tujuan':
+                            prompt = `Buatkan satu tujuan umum dan tiga tujuan khusus ${context}. Format output sebagai JSON dengan key "umum" (string) dan "khusus" (array of strings).`;
+                            result = await callGeminiAPI(prompt, apiKey, true);
+                            if (result && result.umum && Array.isArray(result.khusus)) {
+                                setTujuanUmum(result.umum);
+                                setTujuanKhusus(result.khusus.map((text, i) => ({id: i+1, text})));
+                            }
+                            break;
+                        case 'caraMelaksanakanUmum':
+                            prompt = `Buatkan draf satu paragraf untuk bagian "Cara melaksanakan kegiatan" secara umum ${prioritasContext}. Jelaskan bagaimana siklus PDCA dipakai untuk menjelaskan kegiatan yang dibuat untuk mengatasi akar masalah prioritas.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setCaraMelaksanakanUmum(result);
+                            break;
+                        case 'sasaranUmum':
+                            prompt = `Buatkan daftar 5-8 poin sasaran umum yang spesifik dan terukur ${kegiatanContext}. Format sebagai JSON array of strings.`;
+                            result = await callGeminiAPI(prompt, apiKey, true);
+                            if (Array.isArray(result)) {
+                                 setSasaranUmum(result.map((text, i) => ({id: i+1, text})));
+                             }
+                            break;
+                        case 'evaluasi':
+                            prompt = `Buatkan paragraf untuk bagian "Evaluasi Pelaksanaan Kegiatan dan Pelaporannya" ${context}. Jelaskan kapan evaluasi dilakukan dan bagaimana pelaporannya.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setEvaluasi(result);
+                            break;
+                        case 'pencatatan':
+                            prompt = `Buatkan paragraf untuk bagian "Pencatatan, Pelaporan dan Evaluasi Kegiatan" ${context}. Jelaskan bagaimana pencatatan, pelaporan, dan evaluasi kegiatan secara menyeluruh dilakukan.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setPencatatan(result);
+                            break;
+                    }
+                    showToast(`Bagian ${section} berhasil dibuat oleh AI.`);
+                } catch (error) {
+                    showToast(`Gagal membuat bagian ${section}: ${error.message}`);
+                } finally {
+                    setIsLoading(prev => ({ ...prev, [section]: false }));
+                }
+            }, [namaProgram, apiKey, showToast, namaPuskesmas, pengorganisasian, kegiatanPokok, topPriorities]);
+
+            const handleGenerateRootCauses = useCallback(async (masalahId) => {
+                if (!apiKey) {
+                    showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
+                    return;
+                }
+                const currentMasalah = masalah.find(m => m.id === masalahId);
+                if (!currentMasalah || !currentMasalah.text) {
+                    showToast('Mohon isi deskripsi masalah terlebih dahulu.');
+                    return;
+                }
+                setIsLoading(prev => ({...prev, [`rootCause-${masalahId}`]: true}));
+                try {
+                    const prompt = `Sebutkan 5 kemungkinan akar masalah untuk masalah berikut di sebuah puskesmas: "${currentMasalah.text}". Berikan jawaban dalam format JSON array of strings.`;
+                    const result = await callGeminiAPI(prompt, apiKey, true);
+                    if (Array.isArray(result)) {
+                        const newRootCauses = result.map(text => ({ id: Date.now() + Math.random(), text, U: 1, S: 1, G: 1 }));
+                        setMasalah(prev => prev.map(m => m.id === masalahId ? {...m, rootCauses: [...(m.rootCauses || []), ...newRootCauses]} : m));
+                        showToast('Akar masalah berhasil dibuat oleh AI.');
+                    }
+                } catch(error) {
+                    showToast(`Gagal membuat akar masalah: ${error.message}`);
+                } finally {
+                    setIsLoading(prev => ({...prev, [`rootCause-${masalahId}`]: false}));
+                }
+            }, [masalah, apiKey, showToast]);
+
+            const handleAnalyzePriorities = () => {
+                const priorities = masalah.map(m => {
+                    if (!m.rootCauses || m.rootCauses.length === 0) {
+                        return { problemText: m.text, topRootCause: null };
+                    }
+                    const sortedRootCauses = [...m.rootCauses].sort((a, b) => (b.U * b.S * b.G) - (a.U * a.S * a.G));
+                    return { problemText: m.text, topRootCause: sortedRootCauses[0] };
+                }).filter(p => p.topRootCause);
+
+                setTopPriorities(priorities);
+
+                if (priorities.length === 0) {
+                    showToast('Tidak ada akar masalah untuk dianalisis.');
+                    setPilihanPrioritas('');
+                    return;
+                }
+                
+                const priorityText = `Berdasarkan data tersebut di atas, maka prioritas peningkatan mutu untuk program "${namaProgram}" adalah:\n` + priorities.map(p => `- ${p.topRootCause.text} (terkait masalah: ${p.problemText})`).join('\n');
+                setPilihanPrioritas(priorityText);
+                showToast('Analisis prioritas selesai.');
+            };
+
+            const handleGenerateKegiatanFromPriorities = useCallback(async () => {
+                if (!apiKey) {
+                    showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
+                    return;
+                }
+                if (topPriorities.length === 0) {
+                    showToast('Lakukan analisis prioritas terlebih dahulu di Bab II.');
+                    return;
+                }
+                setIsLoading(prev => ({...prev, kegiatanFromPrio: true}));
+                try {
+                    const priorityDescriptions = topPriorities.map(p => p.topRootCause.text).join(', ');
+                    const prompt = `Berdasarkan akar masalah prioritas berikut: "${priorityDescriptions}", buatkan daftar Kegiatan Pokok dan Rincian Kegiatannya untuk program "${namaProgram}". Format sebagai JSON array, setiap objek memiliki key "nama" (kegiatan pokok) dan "rincian" (array of strings untuk rinciannya).`;
+                    const result = await callGeminiAPI(prompt, apiKey, true);
+                    if (Array.isArray(result)) {
+                        setKegiatanPokok(result.map((kp, i) => ({ id: i + 1, nama: kp.nama, rincian: kp.rincian.map((r, j) => ({ id: j + 1, text: r })) })));
+                        showToast('Kegiatan Pokok berhasil dibuat berdasarkan prioritas.');
+                    }
+                } catch(error) {
+                    showToast(`Gagal membuat Kegiatan Pokok: ${error.message}`);
+                } finally {
+                    setIsLoading(prev => ({...prev, kegiatanFromPrio: false}));
+                }
+            }, [topPriorities, namaProgram, apiKey, showToast]);
+
+            const handleGenerateRincianPelaksanaan = useCallback(async () => {
+                if (!apiKey) {
+                    showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
+                    return;
+                }
+                if (!kegiatanPokok || kegiatanPokok.length === 0 || !kegiatanPokok[0].nama) {
+                    showToast('Mohon isi Bab V. Kegiatan Pokok terlebih dahulu.');
+                    return;
+                }
+                setIsLoading(prev => ({ ...prev, rincianPelaksanaan: true }));
+                try {
+                    const prompt = `Berdasarkan daftar Kegiatan Pokok berikut: ${JSON.stringify(kegiatanPokok)}. Untuk setiap kegiatan pokok, buatkan 'sasaran_umum' yang relevan. Kemudian, untuk setiap 'rincian' di dalam setiap kegiatan pokok, buatkan 'sasaran' spesifik (target terukur) dan 'cara_melaksanakan_kegiatan' (metode pelaksanaan). Format output sebagai JSON array. Setiap objek dalam array mewakili satu kegiatan pokok dan harus memiliki properti 'kegiatan_pokok', 'sasaran_umum', dan 'rincian_data' (array of objects). Setiap objek dalam 'rincian_data' harus memiliki 'rincian_kegiatan', 'sasaran', dan 'cara_melaksanakan_kegiatan'.`;
+                    const result = await callGeminiAPI(prompt, apiKey, true);
+                    setRincianPelaksanaan(result);
+                    showToast('Tabel Rincian Pelaksanaan berhasil dibuat oleh AI.');
+                } catch(error) {
+                    showToast(`Gagal membuat Rincian Pelaksanaan: ${error.message}`);
+                } finally {
+                    setIsLoading(prev => ({ ...prev, rincianPelaksanaan: false }));
+                }
+            }, [kegiatanPokok, apiKey, showToast]);
+
+            const handleGenerate = useCallback(async () => {
+                if (!apiKey) {
+                    showToast('API Key tidak tersedia. Tidak dapat membuat dokumen.');
+                    return;
+                }
+                setIsLoading(prev => ({...prev, finalDoc: true}));
+                try {
+                    const allData = {
+                        namaPuskesmas, kecamatan, kabupaten, tahun, namaProgram, pendahuluan,
+                        masalah, topPriorities, pengorganisasian, tataHubunganKerja, pelaporan,
+                        tujuanUmum, tujuanKhusus, kegiatanPokok, caraMelaksanakanUmum,
+                        sasaranUmum, rincianPelaksanaan, jadwal, evaluasi, pencatatan, months
+                    };
+
+                    const prompt = `Anda adalah seorang ahli dalam menyusun dokumen akreditasi puskesmas di Indonesia. Tugas Anda adalah membuat Kerangka Acuan Program yang lengkap, formal, dan informatif berdasarkan data JSON berikut. Susunlah menjadi sebuah narasi yang utuh dan koheren, bukan poin-poin. Perbaiki susunan kalimat agar lebih profesional. Format outputnya adalah Markdown.
+
+                    **Data:**
+                    ${JSON.stringify(allData, null, 2)}
+
+                    **Instruksi Pemformatan dan Narasi:**
+                    1.  **Judul Utama:** Buat judul yang lengkap dan letakkan di tengah. Contoh: "# KERANGKA ACUAN PROGRAM [Nama Program]\\n## PUSKESMAS [Nama Puskesmas] TAHUN [Tahun]".
+                    2.  **Narasi Utuh:** Ubah semua data menjadi paragraf naratif. Jangan hanya menyalin data mentah. Contohnya, untuk latar belakang, ceritakan masalah yang ada secara mengalir.
+                    3.  **Rata Kiri-Kanan (Justify):** Semua paragraf harus diformat untuk rata kiri-kanan. (Meskipun Markdown tidak secara native mendukung justify, tulis narasinya seolah-olah akan ditampilkan seperti itu).
+                    4.  **Tabel Profesional:** Pastikan semua tabel (Kegiatan Pokok, Rincian Pelaksanaan, Jadwal) diformat dengan benar dalam Markdown. Tabel harus utuh dan jelas, bukan dalam format ASCII art yang aneh.
+                    5.  **Bahasa Formal:** Gunakan bahasa Indonesia yang formal, baku, dan profesional sesuai standar dokumen resmi.
+                    
+                    Mulai dokumen dengan judul, diikuti oleh Bab I sampai IX secara berurutan.`;
+
+                    const result = await callGeminiAPI(prompt, apiKey);
+                    setGeneratedMarkdown(result);
+                    showToast("Kerangka Acuan Program berhasil dibuat!");
+
+                } catch(error) {
+                    showToast(`Gagal membuat dokumen akhir: ${error.message}`);
+                } finally {
+                    setIsLoading(prev => ({...prev, finalDoc: false}));
+                }
+            }, [
+                namaPuskesmas, kecamatan, kabupaten, tahun, namaProgram, pendahuluan,
+                masalah, topPriorities, pengorganisasian, tataHubunganKerja, pelaporan,
+                tujuanUmum, tujuanKhusus, kegiatanPokok, caraMelaksanakanUmum,
+                sasaranUmum, rincianPelaksanaan, jadwal, evaluasi, pencatatan, apiKey, showToast
+            ]);
+            
+            const addMasalah = () => setMasalah(prev => [...prev, {id: Date.now(), text: '', rootCauses: []}]);
+            const removeMasalah = (id) => setMasalah(prev => prev.filter(m => m.id !== id));
+            const updateMasalahText = (id, text) => setMasalah(prev => prev.map(m => m.id === id ? {...m, text} : m));
+
+            const addRootCause = (masalahId) => setMasalah(prev => prev.map(m => m.id === masalahId ? {...m, rootCauses: [...(m.rootCauses || []), {id: Date.now(), text: '', U: 1, S: 1, G: 1}]} : m));
+            const removeRootCause = (masalahId, rootCauseId) => setMasalah(prev => prev.map(m => m.id === masalahId ? {...m, rootCauses: m.rootCauses.filter(rc => rc.id !== rootCauseId)} : m));
+            const updateRootCause = (masalahId, rootCauseId, field, value) => setMasalah(prev => prev.map(m => m.id === masalahId ? {...m, rootCauses: m.rootCauses.map(rc => rc.id === rootCauseId ? {...rc, [field]: value} : rc)} : m));
+            
+            const handleListChange = (setter, list, id, value) => setter(list.map(item => item.id === id ? { ...item, text: value } : item));
+            const addListItem = (setter, list) => setter([...list, {id: Date.now(), text: ''}]);
+            const removeListItem = (setter, list, id) => setter(list.filter(item => item.id !== id));
+
+            return (
+                <div>
+                    {/* All form sections for Program Generator are here, unchanged */}
+                    <div className="form-section">
+                        <h2>Informasi Umum</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label className="form-label">Nama Puskesmas</label><input type="text" className="form-input" value={namaPuskesmas} onChange={e => setNamaPuskesmas(e.target.value)} /></div>
+                            <div><label className="form-label">Tahun</label><input type="number" className="form-input" value={tahun} onChange={e => setTahun(e.target.value)} /></div>
+                            <div><label className="form-label">Kecamatan</label><input type="text" className="form-input" value={kecamatan} onChange={e => setKecamatan(e.target.value)} /></div>
+                            <div><label className="form-label">Kabupaten/Kota</label><input type="text" className="form-input" value={kabupaten} onChange={e => setKabupaten(e.target.value)} /></div>
+                            <div className="md:col-span-2"><label className="form-label font-semibold">Nama Program</label><input type="text" className="form-input" value={namaProgram} onChange={e => setNamaProgram(e.target.value)} placeholder="Contoh: Peningkatan Mutu Program KIA" /></div>
+                        </div>
+                    </div>
+                    
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>I. Pendahuluan</h2><AiButton onClick={() => handleGenerateSection('pendahuluan')} isLoading={isLoading.pendahuluan} /></div>
+                        <textarea className="form-textarea" rows="3" value={pendahuluan} onChange={e => setPendahuluan(e.target.value)} placeholder="Jelaskan hal-hal umum terkait program..."></textarea>
+                    </div>
+                    <div className="form-section">
+                        <h2>II. Latar Belakang</h2>
+                        <label className="form-label font-semibold">A-C. Analisis Masalah & Penentuan Prioritas</label>
+                        {masalah.map((m, index) => (
+                            <div key={m.id} className="p-4 border rounded-lg mb-4 bg-slate-50">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-semibold text-gray-800">Masalah Utama {index + 1}</h3>
+                                    <RemoveButton onClick={() => removeMasalah(m.id)} />
+                                </div>
+                                <textarea className="form-textarea my-2" rows="2" value={m.text} onChange={e => updateMasalahText(m.id, e.target.value)} placeholder="Deskripsikan masalah utama di sini..."></textarea>
+                                
+                                <div className="flex items-center space-x-2 my-2">
+                                     <AiButton onClick={() => handleGenerateRootCauses(m.id)} isLoading={isLoading[`rootCause-${m.id}`]}>Generate Akar Masalah</AiButton>
+                                     <AddButton onClick={() => addRootCause(m.id)}>+ Tambah Manual</AddButton>
+                                </div>
+
+                                {(m.rootCauses || []).map(rc => (
+                                    <div key={rc.id} className="p-3 bg-white rounded-md border grid grid-cols-12 gap-2 items-center mb-2">
+                                        <div className="col-span-12 md:col-span-5"><input type="text" className="form-input" value={rc.text} onChange={e => updateRootCause(m.id, rc.id, 'text', e.target.value)} placeholder="Deskripsi akar masalah..."/></div>
+                                        <div className="col-span-2 md:col-span-1 text-center"><label className="text-sm">U:</label></div>
+                                        <div className="col-span-4 md:col-span-1"><select className="form-select p-2 text-sm" value={rc.U} onChange={e => updateRootCause(m.id, rc.id, 'U', Number(e.target.value))}><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+                                        <div className="col-span-2 md:col-span-1 text-center"><label className="text-sm">S:</label></div>
+                                        <div className="col-span-4 md:col-span-1"><select className="form-select p-2 text-sm" value={rc.S} onChange={e => updateRootCause(m.id, rc.id, 'S', Number(e.target.value))}><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+                                        <div className="col-span-2 md:col-span-1 text-center"><label className="text-sm">G:</label></div>
+                                        <div className="col-span-4 md:col-span-1"><select className="form-select p-2 text-sm" value={rc.G} onChange={e => updateRootCause(m.id, rc.id, 'G', Number(e.target.value))}><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></div>
+                                        <div className="col-span-12 md:col-span-1 text-right"><RemoveButton onClick={() => removeRootCause(m.id, rc.id)} /></div>
+                                    </div>
+                                ))}
+                            </div>
+                        ))}
+                        <AddButton onClick={addMasalah}>+ Tambah Masalah Utama</AddButton>
+
+                        <div className="mt-6 text-center">
+                            <button onClick={handleAnalyzePriorities} className="btn-ai bg-green-600 hover:bg-green-700">Analisis & Tentukan Prioritas</button>
+                        </div>
+                        
+                        <label className="form-label font-semibold mt-6">D. Pilihan Prioritas (Hasil Analisis)</label>
+                        <textarea className="form-textarea bg-gray-100" rows="4" value={pilihanPrioritas} readOnly placeholder="Hasil analisis prioritas akan muncul di sini..."></textarea>
+                    </div>
+                    <div className="form-section">
+                        <h2>III. Pengorganisasian dan Tata Hubungan Kerja</h2>
+                        <div className="flex justify-between items-center mb-2"><label className="form-label">A. Pengorganisasian</label><AiButton onClick={() => handleGenerateSection('pengorganisasian')} isLoading={isLoading.pengorganisasian} /></div>
+                        <textarea className="form-textarea" rows="4" value={pengorganisasian} onChange={e => setPengorganisasian(e.target.value)} placeholder="Jelaskan struktur, misal: Pelindung: Ka Puskesmas..."></textarea>
+                        <div className="flex justify-between items-center mb-2 mt-4"><label className="form-label">B. Tata Hubungan Kerja</label><AiButton onClick={() => handleGenerateSection('tataHubunganKerja')} isLoading={isLoading.tataHubunganKerja} /></div>
+                        <textarea className="form-textarea" rows="4" value={tataHubunganKerja} onChange={e => setTataHubunganKerja(e.target.value)}></textarea>
+                        <div className="flex justify-between items-center mb-2 mt-4"><label className="form-label">C. Alur Pelaporan</label><AiButton onClick={() => handleGenerateSection('pelaporan')} isLoading={isLoading.pelaporan} /></div>
+                        <textarea className="form-textarea" rows="4" value={pelaporan} onChange={e => setPelaporan(e.target.value)}></textarea>
+                    </div>
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>IV. Tujuan</h2><AiButton onClick={() => handleGenerateSection('tujuan')} isLoading={isLoading.tujuan} /></div>
+                        <label className="form-label">A. Tujuan Umum</label>
+                        <input type="text" className="form-input" value={tujuanUmum} onChange={e => setTujuanUmum(e.target.value)} />
+                        <label className="form-label mt-4">B. Tujuan Khusus</label>
+                        {(tujuanKhusus || []).map(item => (
+                            <div key={item.id} className="flex items-center mb-2"><input type="text" className="form-input" value={item.text} onChange={e => handleListChange(setTujuanKhusus, tujuanKhusus, item.id, e.target.value)} /><RemoveButton onClick={() => removeListItem(setTujuanKhusus, tujuanKhusus, item.id)} /></div>
+                        ))}
+                        <AddButton onClick={() => addListItem(setTujuanKhusus, tujuanKhusus)}>+ Tambah Tujuan Khusus</AddButton>
+                    </div>
+                    <div className="form-section">
+                         <div className="flex justify-between items-center"><h2>V. Kegiatan Pokok dan Rincian Kegiatan</h2><AiButton onClick={handleGenerateKegiatanFromPriorities} isLoading={isLoading.kegiatanFromPrio}>Generate dari Prioritas</AiButton></div>
+                        <p className="text-sm text-gray-500 mb-4">Klik "Generate dari Prioritas" untuk membuat kegiatan berdasarkan analisis di Bab II, atau isi secara manual.</p>
+                        {(kegiatanPokok || []).map((kp, index) => (
+                            <div key={kp.id} className="p-4 border rounded-md mb-3 bg-gray-50">
+                                <div className="flex justify-between items-center"><label className="form-label">Kegiatan Pokok {index + 1}</label><RemoveButton onClick={() => setKegiatanPokok(kegiatanPokok.filter(item => item.id !== kp.id))} /></div>
+                                <input type="text" className="form-input mb-2" value={kp.nama} onChange={e => setKegiatanPokok(kegiatanPokok.map(item => item.id === kp.id ? {...item, nama: e.target.value} : item))} />
+                                <label className="form-label text-sm">Rincian Kegiatan:</label>
+                                {(kp.rincian || []).map(r => (
+                                    <div key={r.id} className="flex items-center mb-1">
+                                        <input type="text" className="form-input form-input-sm" value={r.text} onChange={e => setKegiatanPokok(kegiatanPokok.map(item => item.id === kp.id ? {...item, rincian: item.rincian.map(ri => ri.id === r.id ? {...ri, text: e.target.value} : ri)} : item))} />
+                                        {kp.rincian.length > 1 && <RemoveButton onClick={() => setKegiatanPokok(kegiatanPokok.map(item => item.id === kp.id ? {...item, rincian: item.rincian.filter(ri => ri.id !== r.id)} : item))} />}
+                                    </div>
+                                ))}
+                                <AddButton onClick={() => setKegiatanPokok(kegiatanPokok.map(item => item.id === kp.id ? {...item, rincian: [...(item.rincian || []), {id: Date.now(), text: ''}]} : item))}>+ Tambah Rincian</AddButton>
+                            </div>
+                        ))}
+                         <AddButton onClick={() => setKegiatanPokok([...(kegiatanPokok || []), {id: Date.now(), nama: '', rincian: [{id: Date.now()+1, text: ''}]}])}>+ Tambah Kegiatan Pokok</AddButton>
+                    </div>
+                    <div className="form-section">
+                        <h2>VI. Cara melaksanakan kegiatan dan sasaran</h2>
+                        <div className="flex justify-between items-center mb-2"><label className="form-label font-semibold">A. Cara melaksanakan kegiatan</label><AiButton onClick={() => handleGenerateSection('caraMelaksanakanUmum')} isLoading={isLoading.caraMelaksanakanUmum} /></div>
+                        <textarea className="form-textarea" rows="2" value={caraMelaksanakanUmum} onChange={e => setCaraMelaksanakanUmum(e.target.value)}></textarea>
+                        <div className="flex justify-between items-center mb-2 mt-4"><label className="form-label font-semibold">B. Sasaran</label><AiButton onClick={() => handleGenerateSection('sasaranUmum')} isLoading={isLoading.sasaranUmum} /></div>
+                        {(sasaranUmum || []).map(item => (
+                            <div key={item.id} className="flex items-center mb-2"><input type="text" className="form-input" value={item.text} onChange={e => handleListChange(setSasaranUmum, sasaranUmum, item.id, e.target.value)} /><RemoveButton onClick={() => removeListItem(setSasaranUmum, sasaranUmum, item.id)} /></div>
+                        ))}
+                        <AddButton onClick={() => addListItem(setSasaranUmum, sasaranUmum)}>+ Tambah Sasaran</AddButton>
+                        <div className="flex justify-between items-center mt-6"><h3 className="form-label font-semibold">C. RINCIAN KEGIATAN, SASARAN KHUSUS, CARA MELAKSANAKAN KEGIATAN</h3><AiButton onClick={handleGenerateRincianPelaksanaan} isLoading={isLoading.rincianPelaksanaan}>Generate Rincian Tabel</AiButton></div>
+                        <p className="text-sm text-gray-500 mb-4">Tabel ini akan diisi AI berdasarkan data "Kegiatan Pokok" (Bab V). Klik tombol "Generate" untuk memulai.</p>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full border text-sm">
+                                <thead className="bg-gray-100"><tr className="border-b"><th className="p-2 border-r">No</th><th className="p-2 border-r">Kegiatan Pokok</th><th className="p-2 border-r">Sasaran umum</th><th className="p-2 border-r">Rincian Kegiatan</th><th className="p-2 border-r">Sasaran</th><th className="p-2">Cara melaksanakan kegiatan</th></tr></thead>
+                                <tbody>
+                                    {(rincianPelaksanaan || []).map((item, index) => (
+                                        <tr key={index} className="border-b">
+                                            <td className="p-2 border-r align-top">{String.fromCharCode(65 + index)}</td>
+                                            <td className="p-2 border-r align-top"><textarea className="form-textarea border-0 p-0" value={item.kegiatan_pokok} readOnly/></td>
+                                            <td className="p-2 border-r align-top"><textarea className="form-textarea border-0 p-0" value={item.sasaran_umum} readOnly/></td>
+                                            <td className="p-2 border-r align-top">{(item.rincian_data || []).map((rd, rd_idx) => <textarea key={rd_idx} className="form-textarea border-0 p-0 mb-2" value={rd.rincian_kegiatan}/>)}</td>
+                                             <td className="p-2 border-r align-top">{(item.rincian_data || []).map((rd, rd_idx) => <textarea key={rd_idx} className="form-textarea border-0 p-0 mb-2" value={rd.sasaran}/>)}</td>
+                                             <td className="p-2 align-top">{(item.rincian_data || []).map((rd, rd_idx) => <textarea key={rd_idx} className="form-textarea border-0 p-0 mb-2" value={rd.cara_melaksanakan_kegiatan}/>)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div className="form-section">
+                        <h2>VII. Jadwal Kegiatan</h2>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm text-left">
+                                <thead className="bg-gray-100"><tr><th className="p-2">Kegiatan</th>{months.map(m => <th key={m} className="p-2 text-center">{m}</th>)}</tr></thead>
+                                <tbody>
+                                    {(kegiatanPokok || []).map(kp => (
+                                        <tr key={kp.id} className="border-b"><td className="p-2 font-medium">{kp.nama}</td>{months.map(m => (<td key={m} className="p-2 text-center"><input type="checkbox" className="h-4 w-4" checked={!!(jadwal || {})[`${kp.id}-${m}`]} onChange={() => setJadwal({...jadwal, [`${kp.id}-${m}`]: !jadwal[`${kp.id}-${m}`]})} /></td>))}</tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>VIII. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya</h2><AiButton onClick={() => handleGenerateSection('evaluasi')} isLoading={isLoading.evaluasi} /></div>
+                        <textarea className="form-textarea" rows="3" value={evaluasi} onChange={e => setEvaluasi(e.target.value)} placeholder="Jelaskan kapan evaluasi dilakukan dan bagaimana pelaporannya..."></textarea>
+                    </div>
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>IX. Pencatatan, Pelaporan dan Evaluasi Kegiatan</h2><AiButton onClick={() => handleGenerateSection('pencatatan')} isLoading={isLoading.pencatatan} /></div>
+                        <textarea className="form-textarea" rows="3" value={pencatatan} onChange={e => setPencatatan(e.target.value)} placeholder="Jelaskan bagaimana pencatatan, pelaporan, dan evaluasi kegiatan secara menyeluruh..."></textarea>
+                    </div>
+
+                    <button type="button" className="btn-primary" onClick={handleGenerate} disabled={isLoading.finalDoc}>
+                        {isLoading.finalDoc ? <div className="loader mx-auto"></div> : 'Buat Kerangka Acuan Program'}
+                    </button>
+
+                    {generatedMarkdown && (
+                        <div className="mt-8 bg-gray-800 text-white p-6 rounded-xl">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-2xl font-bold text-green-400">Hasil</h2>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handlePrintAndSaveAsPdf(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Cetak / Simpan PDF</button>
+                                    <button onClick={() => handleDownloadDocx(generatedMarkdown, `KAP - ${namaProgram}`)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Unduh DOCX</button>
+                                </div>
+                            </div>
+                            <pre className="whitespace-pre-wrap break-words bg-gray-900 p-4 rounded-md text-sm leading-relaxed">{generatedMarkdown}</pre>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        // --- Generator for Kerangka Acuan KEGIATAN ---
+        const KerangkaAcuanKegiatanGenerator = ({ apiKey, showToast }) => {
+            const [namaPuskesmas, setNamaPuskesmas] = useState('');
+            const [tahun, setTahun] = useState(new Date().getFullYear().toString());
+            const [namaKegiatan, setNamaKegiatan] = useState('');
+            const [pendahuluan, setPendahuluan] = useState('');
+            const [latarBelakang, setLatarBelakang] = useState('');
+            const [tujuanUmum, setTujuanUmum] = useState('');
+            const [tujuanKhusus, setTujuanKhusus] = useState([{id: 1, text: ''}]);
+            const [kegiatanPokok, setKegiatanPokok] = useState([{id: 1, text: ''}]);
+            const [rincianKegiatan, setRincianKegiatan] = useState([{id: 1, text: ''}]);
+            const [caraMelaksanakan, setCaraMelaksanakan] = useState('');
+            const [sasaran, setSasaran] = useState('');
+            const [jadwal, setJadwal] = useState({});
+            const [evaluasi, setEvaluasi] = useState('');
+            const [pencatatan, setPencatatan] = useState('');
+            const [generatedMarkdown, setGeneratedMarkdown] = useState('');
+            const [isLoading, setIsLoading] = useState({});
+
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+
+            const handleListChange = (setter, list, id, value) => setter(list.map(item => item.id === id ? { ...item, text: value } : item));
+            const addListItem = (setter, list) => setter([...list, {id: Date.now(), text: ''}]);
+            const removeListItem = (setter, list, id) => setter(list.filter(item => item.id !== id));
+
+            const handleGenerateSection = useCallback(async (section) => {
+                if (!apiKey) {
+                    showToast('API Key tidak tersedia. Fitur AI dinonaktifkan.');
+                    return;
+                }
+                if (!namaKegiatan) {
+                    showToast(`Mohon isi Nama Kegiatan terlebih dahulu.`);
+                    return;
+                }
+                setIsLoading(prev => ({ ...prev, [section]: true }));
+                try {
+                    let prompt, result;
+                    const context = `untuk sebuah Kerangka Acuan Kegiatan (KAK) berjudul "${namaKegiatan}" di ${namaPuskesmas || 'sebuah puskesmas'}.`;
+
+                    switch(section) {
+                        case 'pendahuluan':
+                            prompt = `Buatkan satu paragraf pendahuluan ${context}. Jelaskan secara singkat apa kegiatan ini dan mengapa penting.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setPendahuluan(result);
+                            break;
+                        case 'latarBelakang':
+                            prompt = `Buatkan satu atau dua paragraf latar belakang ${context}. Jelaskan alasan atau data yang mendasari perlunya kegiatan ini dilaksanakan.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setLatarBelakang(result);
+                            break;
+                        case 'tujuan':
+                            prompt = `Buatkan satu tujuan umum dan tiga tujuan khusus ${context}. Format output sebagai JSON dengan key "umum" (string) dan "khusus" (array of strings).`;
+                            result = await callGeminiAPI(prompt, apiKey, true);
+                            if (result && result.umum && Array.isArray(result.khusus)) {
+                                setTujuanUmum(result.umum);
+                                setTujuanKhusus(result.khusus.map((text, i) => ({id: i+1, text})));
+                            }
+                            break;
+                        case 'kegiatan':
+                            prompt = `Buatkan daftar 2-3 kegiatan pokok dan 3-5 rincian kegiatan ${context}. Format sebagai JSON dengan key "pokok" (array of strings) dan "rincian" (array of strings).`;
+                            result = await callGeminiAPI(prompt, apiKey, true);
+                            if (result && Array.isArray(result.pokok) && Array.isArray(result.rincian)) {
+                                setKegiatanPokok(result.pokok.map((text, i) => ({id: i+1, text})));
+                                setRincianKegiatan(result.rincian.map((text, i) => ({id: i+1, text})));
+                            }
+                            break;
+                        case 'caraMelaksanakan':
+                            prompt = `Jelaskan secara naratif metode atau cara pelaksanaan untuk kegiatan "${namaKegiatan}". Contoh: penyuluhan dengan ceramah dan tanya jawab, demonstrasi, kunjungan lapangan, dll.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setCaraMelaksanakan(result);
+                            break;
+                        case 'sasaran':
+                            prompt = `Sebutkan sasaran atau target peserta/penerima manfaat dari kegiatan "${namaKegiatan}". Buat dalam bentuk daftar poin.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setSasaran(result);
+                            break;
+                        case 'evaluasi':
+                            prompt = `Buatkan paragraf untuk bagian "Evaluasi Pelaksanaan Kegiatan dan Pelaporan" ${context}. Jelaskan bagaimana dan kapan evaluasi dilakukan serta kepada siapa hasilnya dilaporkan.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setEvaluasi(result);
+                            break;
+                        case 'pencatatan':
+                            prompt = `Buatkan paragraf untuk bagian "Pencatatan, Pelaporan, dan Evaluasi Kegiatan" ${context}. Jelaskan dokumen apa yang dicatat, bagaimana alur pelaporannya, dan bagaimana evaluasi akhir dilakukan.`;
+                            result = await callGeminiAPI(prompt, apiKey);
+                            setPencatatan(result);
+                            break;
+                    }
+                    showToast(`Bagian ${section} berhasil dibuat oleh AI.`);
+                } catch (error) {
+                    showToast(`Gagal membuat bagian ${section}: ${error.message}`);
+                } finally {
+                    setIsLoading(prev => ({ ...prev, [section]: false }));
+                }
+            }, [namaKegiatan, namaPuskesmas, apiKey, showToast]);
+
+            const handleGenerate = useCallback(async () => {
+                if (!apiKey) {
+                    showToast('API Key tidak tersedia. Tidak dapat membuat dokumen.');
+                    return;
+                }
+                setIsLoading(prev => ({...prev, finalDoc: true}));
+                try {
+                    const allData = {
+                        namaPuskesmas, tahun, namaKegiatan, pendahuluan, latarBelakang,
+                        tujuanUmum, tujuanKhusus, kegiatanPokok, rincianKegiatan,
+                        caraMelaksanakan, sasaran, jadwal, evaluasi, pencatatan, months
+                    };
+
+                    const prompt = `Anda adalah seorang ahli dalam menyusun dokumen akreditasi puskesmas di Indonesia. Tugas Anda adalah membuat Kerangka Acuan Kegiatan (KAK) yang lengkap, formal, dan informatif berdasarkan data JSON berikut. Susunlah menjadi sebuah narasi yang utuh dan koheren, bukan poin-poin. Perbaiki susunan kalimat agar lebih profesional. Format outputnya adalah Markdown.
+
+                    **Data:**
+                    ${JSON.stringify(allData, null, 2)}
+
+                    **Instruksi Pemformatan dan Narasi:**
+                    1.  **Judul Utama:** Buat judul yang lengkap dan letakkan di tengah. Contoh: "# KERANGKA ACUAN KEGIATAN [Nama Kegiatan]\\n## PUSKESMAS [Nama Puskesmas] TAHUN [Tahun]".
+                    2.  **Struktur KAK:** Ikuti struktur KAK standar: A. Pendahuluan, B. Latar Belakang, C. Tujuan (1. Tujuan Umum, 2. Tujuan Khusus), D. Kegiatan Pokok dan Rincian Kegiatan, E. Cara Melaksanakan Kegiatan, F. Sasaran, G. Jadwal Pelaksanaan Kegiatan, H. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya, I. Pencatatan, Pelaporan, dan Evaluasi Kegiatan.
+                    3.  **Narasi Utuh:** Ubah semua data menjadi paragraf naratif. Jangan hanya menyalin data mentah.
+                    4.  **Rata Kiri-Kanan (Justify):** Semua paragraf harus diformat untuk rata kiri-kanan.
+                    5.  **Tabel Profesional:** Buat tabel jadwal kegiatan dalam format Markdown yang benar dan utuh.
+                    6.  **Bahasa Formal:** Gunakan bahasa Indonesia yang formal, baku, dan profesional.
+                    
+                    Mulai dokumen dengan judul, diikuti oleh setiap bagian (A, B, C, dst.) secara berurutan.`;
+
+                    const result = await callGeminiAPI(prompt, apiKey);
+                    setGeneratedMarkdown(result);
+                    showToast("Kerangka Acuan Kegiatan berhasil dibuat!");
+
+                } catch(error) {
+                    showToast(`Gagal membuat dokumen akhir: ${error.message}`);
+                } finally {
+                    setIsLoading(prev => ({...prev, finalDoc: false}));
+                }
+            }, [
+                namaPuskesmas, tahun, namaKegiatan, pendahuluan, latarBelakang,
+                tujuanUmum, tujuanKhusus, kegiatanPokok, rincianKegiatan,
+                caraMelaksanakan, sasaran, jadwal, evaluasi, pencatatan, apiKey, showToast
+            ]);
+
+            return (
+                <div>
+                    <div className="form-section">
+                        <h2>Informasi Umum</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div><label className="form-label">Nama Puskesmas</label><input type="text" className="form-input" value={namaPuskesmas} onChange={e => setNamaPuskesmas(e.target.value)} /></div>
+                            <div><label className="form-label">Tahun</label><input type="number" className="form-input" value={tahun} onChange={e => setTahun(e.target.value)} /></div>
+                            <div className="md:col-span-2"><label className="form-label font-semibold">Nama Kegiatan</label><input type="text" className="form-input" value={namaKegiatan} onChange={e => setNamaKegiatan(e.target.value)} placeholder="Contoh: Kelas Ibu Hamil di Desa Sukamaju" /></div>
+                        </div>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>A. Pendahuluan</h2><AiButton onClick={() => handleGenerateSection('pendahuluan')} isLoading={isLoading.pendahuluan} /></div>
+                        <textarea className="form-textarea" rows="3" value={pendahuluan} onChange={e => setPendahuluan(e.target.value)}></textarea>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>B. Latar Belakang</h2><AiButton onClick={() => handleGenerateSection('latarBelakang')} isLoading={isLoading.latarBelakang} /></div>
+                        <textarea className="form-textarea" rows="3" value={latarBelakang} onChange={e => setLatarBelakang(e.target.value)}></textarea>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>C. Tujuan</h2><AiButton onClick={() => handleGenerateSection('tujuan')} isLoading={isLoading.tujuan} /></div>
+                        <label className="form-label">Tujuan Umum</label>
+                        <input type="text" className="form-input" value={tujuanUmum} onChange={e => setTujuanUmum(e.target.value)} />
+                        <label className="form-label mt-4">Tujuan Khusus</label>
+                        {(tujuanKhusus || []).map(item => (
+                            <div key={item.id} className="flex items-center mb-2"><input type="text" className="form-input" value={item.text} onChange={e => handleListChange(setTujuanKhusus, tujuanKhusus, item.id, e.target.value)} /><RemoveButton onClick={() => removeListItem(setTujuanKhusus, tujuanKhusus, item.id)} /></div>
+                        ))}
+                        <AddButton onClick={() => addListItem(setTujuanKhusus, tujuanKhusus)}>+ Tambah Tujuan Khusus</AddButton>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>D. Kegiatan Pokok dan Rincian Kegiatan</h2><AiButton onClick={() => handleGenerateSection('kegiatan')} isLoading={isLoading.kegiatan} /></div>
+                        <label className="form-label">Kegiatan Pokok</label>
+                        {(kegiatanPokok || []).map(item => (
+                            <div key={item.id} className="flex items-center mb-2"><input type="text" className="form-input" value={item.text} onChange={e => handleListChange(setKegiatanPokok, kegiatanPokok, item.id, e.target.value)} /><RemoveButton onClick={() => removeListItem(setKegiatanPokok, kegiatanPokok, item.id)} /></div>
+                        ))}
+                        <AddButton onClick={() => addListItem(setKegiatanPokok, kegiatanPokok)}>+ Tambah Kegiatan Pokok</AddButton>
+                        
+                        <label className="form-label mt-4">Rincian Kegiatan</label>
+                        {(rincianKegiatan || []).map(item => (
+                            <div key={item.id} className="flex items-center mb-2"><input type="text" className="form-input" value={item.text} onChange={e => handleListChange(setRincianKegiatan, rincianKegiatan, item.id, e.target.value)} /><RemoveButton onClick={() => removeListItem(setRincianKegiatan, rincianKegiatan, item.id)} /></div>
+                        ))}
+                        <AddButton onClick={() => addListItem(setRincianKegiatan, rincianKegiatan)}>+ Tambah Rincian Kegiatan</AddButton>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>E. Cara Melaksanakan Kegiatan</h2><AiButton onClick={() => handleGenerateSection('caraMelaksanakan')} isLoading={isLoading.caraMelaksanakan} /></div>
+                        <textarea className="form-textarea" rows="3" value={caraMelaksanakan} onChange={e => setCaraMelaksanakan(e.target.value)}></textarea>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>F. Sasaran</h2><AiButton onClick={() => handleGenerateSection('sasaran')} isLoading={isLoading.sasaran} /></div>
+                        <textarea className="form-textarea" rows="3" value={sasaran} onChange={e => setSasaran(e.target.value)} placeholder="Contoh:&#10;- Ibu hamil trimester 1, 2, dan 3&#10;- Kader Posyandu"></textarea>
+                    </div>
+
+                    <div className="form-section">
+                        <h2>G. Jadwal Pelaksanaan Kegiatan</h2>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm text-left">
+                                <thead className="bg-gray-100"><tr><th className="p-2">Kegiatan Pokok</th>{months.map(m => <th key={m} className="p-2 text-center">{m}</th>)}</tr></thead>
+                                <tbody>
+                                    {(kegiatanPokok || []).filter(kp => kp.text.trim() !== '').map(kp => (
+                                        <tr key={kp.id} className="border-b"><td className="p-2 font-medium">{kp.text}</td>{months.map(m => (<td key={m} className="p-2 text-center"><input type="checkbox" className="h-4 w-4" checked={!!(jadwal || {})[`${kp.id}-${m}`]} onChange={() => setJadwal({...jadwal, [`${kp.id}-${m}`]: !jadwal[`${kp.id}-${m}`]})} /></td>))}</tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>H. Evaluasi Pelaksanaan Kegiatan dan Pelaporannya</h2><AiButton onClick={() => handleGenerateSection('evaluasi')} isLoading={isLoading.evaluasi} /></div>
+                        <textarea className="form-textarea" rows="3" value={evaluasi} onChange={e => setEvaluasi(e.target.value)}></textarea>
+                    </div>
+
+                    <div className="form-section">
+                        <div className="flex justify-between items-center"><h2>I. Pencatatan, Pelaporan, dan Evaluasi Kegiatan</h2><AiButton onClick={() => handleGenerateSection('pencatatan')} isLoading={isLoading.pencatatan} /></div>
+                        <textarea className="form-textarea" rows="3" value={pencatatan} onChange={e => setPencatatan(e.target.value)}></textarea>
+                    </div>
+
+                    <button type="button" className="btn-primary" onClick={handleGenerate} disabled={isLoading.finalDoc}>
+                        {isLoading.finalDoc ? <div className="loader mx-auto"></div> : 'Buat Kerangka Acuan Kegiatan'}
+                    </button>
+
+                    {generatedMarkdown && (
+                        <div className="mt-8 bg-gray-800 text-white p-6 rounded-xl">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="text-2xl font-bold text-green-400">Hasil</h2>
+                                <div className="flex gap-2">
+                                    <button onClick={() => handlePrintAndSaveAsPdf(generatedMarkdown)} className="btn-secondary bg-red-600 hover:bg-red-700">Cetak / Simpan PDF</button>
+                                    <button onClick={() => handleDownloadDocx(generatedMarkdown, `KAK - ${namaKegiatan}`)} className="btn-secondary bg-blue-600 hover:bg-blue-700">Unduh DOCX</button>
+                                </div>
+                            </div>
+                            <pre className="whitespace-pre-wrap break-words bg-gray-900 p-4 rounded-md text-sm leading-relaxed">{generatedMarkdown}</pre>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
